@@ -2763,7 +2763,7 @@ function getTankStats() {
   }
   return { hp: hp, speed: speed, shield: shield, dmg: dmg, color: t.color };
 }
-setTimeout(tryAutoLogin, 500);
+setTimeout(function(){ if (typeof tryAutoLogin === 'function') tryAutoLogin(); }, 500);
 </script>
 </body>
 </html>

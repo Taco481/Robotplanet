@@ -413,10 +413,16 @@
 <div class="wrapper">
   <div class="hp-section" id="hpSection">
     <div class="hp-row" id="playerHpRow">
-      <span class="hp-label player" id="pName">PLAYER</span>
+      <span class="hp-label player" id="pName">P1</span>
       <div class="hp-bar-outer"><div class="hp-bar-inner hp-green" id="pHpBar" style="width:100%">100</div></div>
       <span class="shield-badge" id="pShield"></span>
       <span class="stun-badge" id="pStun"></span>
+    </div>
+    <div class="hp-row" id="player2HpRow" style="display:none">
+      <span class="hp-label player" id="p2Name" style="color:#ff8844">P2</span>
+      <div class="hp-bar-outer"><div class="hp-bar-inner hp-green" id="p2HpBar" style="width:100%">100</div></div>
+      <span class="shield-badge" id="p2Shield"></span>
+      <span class="stun-badge" id="p2Stun"></span>
     </div>
     <div id="enemyHpRows"></div>
     <div id="enemyCount" style="font-size:10px;color:#888;text-align:center;margin-top:2px"></div>
@@ -438,6 +444,7 @@
 
         <div id="modeToggle" class="mode-toggle">
           <button class="mode-main-btn active" onclick="setGameMode('single')">Singleplayer</button>
+          <button class="mode-main-btn" onclick="setGameMode('local2p')">Local 2P</button>
           <button class="mode-main-btn" onclick="setGameMode('multi')">Multiplayer</button>
         </div>
 
@@ -471,8 +478,36 @@
           </div>
         </div>
 
+        <div id="local2pOptions" style="display:none;width:100%;flex-direction:column;align-items:center;gap:8px">
+          <div style="color:#88ffcc;font-size:12px;font-weight:bold">LOCAL 2 PLAYER</div>
+          <div style="font-size:10px;color:#888;text-align:center;line-height:1.6">
+            <b style="color:#44aaff">P1:</b> WASD move | Mouse aim | Click fire<br>
+            <b style="color:#ff8844">P2:</b> Arrows move | IJKL aim | . fire<br>
+            P1: 1-5 weapon | P2: 6-0 weapon
+          </div>
+          <div class="lobby-row">
+            <span class="label">Opponents</span>
+            <div class="btn-group">
+              <button class="enemy-btn" onclick="setEnemyCount(1)">1</button>
+              <button class="enemy-btn active" onclick="setEnemyCount(2)">2</button>
+              <button class="enemy-btn" onclick="setEnemyCount(3)">3</button>
+            </div>
+          </div>
+          <div class="lobby-row">
+            <span class="label">Difficulty</span>
+            <div class="btn-group">
+              <button class="diff-btn active" onclick="setDifficulty(0)">Easy</button>
+              <button class="diff-btn" onclick="setDifficulty(1)">Normal</button>
+              <button class="diff-btn" onclick="setDifficulty(2)">Hard</button>
+            </div>
+          </div>
+        </div>
+
         <div id="multiOptions" style="display:none;width:100%">
           <div class="mp-actions">
+            <button class="mp-btn" id="quickMatchBtn" onclick="quickMatch()" style="background:linear-gradient(135deg,#ff8844,#dd6622);font-weight:bold">⚡ Quick Match</button>
+            <button class="mp-btn secondary" id="cancelQueueBtn" onclick="cancelQuickMatch()" style="display:none">✕ Cancel</button>
+            <div style="margin:6px 0;border-top:1px solid rgba(74,74,255,0.15)"></div>
             <button class="mp-btn" onclick="createRoom()">📡 New Room</button>
             <span style="color:#5555aa;font-size:11px">— or —</span>
             <div class="mp-join-row">
@@ -587,12 +622,19 @@ var weapons = [
   { name: "Mortar",   damage: 35, accuracy: 0.55, speed: 7,  color: "#ffaa44", size: 9,  desc: "Area splash", special: "splash" },
 ];
 
-var player, enemies = [];
+var player, player2 = null, enemies = [];
 var projectiles = [], explosions = [], particles = [], sparks = [], hitTexts = [];
-var keys = {};
-var selectedWeapon = 0, gameActive = false, canShoot = true;
-var shootCooldown = 0, screenShake = { x: 0, y: 0, intensity: 0 };
+var keys = {}, p2Keys = {};
+var selectedWeapon = 0, selectedWeapon2 = 0;
+var gameActive = false, canShoot = true, canShoot2 = true;
+var shootCooldown = 0, shootCooldown2 = 0;
+var screenShake = { x: 0, y: 0, intensity: 0 };
+var p2AimAngle = 0;
 var enemyCount = 1, money = 0;
+function loadMoney() { try { var m = localStorage.getItem('rp_money'); if (m !== null) money = parseInt(m) || 0; } catch(e) {} }
+function saveMoney() { try { localStorage.setItem('rp_money', money); } catch(e) {} }
+function updateLobbyMoney() { var el = document.getElementById('lobbyMoneySmall'); if (el) el.textContent = '$' + money; }
+setInterval(function(){ updateLobbyMoney(); }, 500);
 var controlMode = 'kbm';
 var joystick = { active: false, centerX: 0, centerY: 0, dx: 0, dy: 0, dist: 0, touchId: -1 };
 var aimActive = false, aimDragged = false, aimX = 0, aimY = 0, aimTouchId = -1;
@@ -767,6 +809,8 @@ var mpOpponents = {}; // playerId -> RobotArena
 var lastEnemyBarCount = 0;
 var kothZone = { x: 400, y: 250, radius: 55, owner: -1, progress: 0, maxProgress: 180, score: [], hillTeam: -1 };
 var mpPlayerList = []; // {id, name}
+var quickMatchTimer = null;
+var quickMatchSearching = false;
 var spawnPoints = [{x:150,y:250},{x:650,y:250},{x:150,y:100},{x:650,y:100},{x:400,y:50},{x:400,y:450},{x:150,y:400},{x:650,y:400}];
 
 function balanceTeams(playerCount) {
@@ -777,19 +821,26 @@ function balanceTeams(playerCount) {
 
 function setGameMode(mode) {
   gameMode = mode;
-  if (mode === 'single') {
+  if (mode === 'single' || mode === 'local2p') {
+    cancelQuickMatch();
     mpOpponents = {}; roomCode = null; playerId = null; isHost = false;
     if (typeof mpChannel !== 'undefined' && mpChannel) { mpChannel.unsubscribe(); mpChannel = null; }
+  } else if (mode === 'multi') {
+    document.getElementById('quickMatchBtn').style.display = 'inline-block';
+    document.getElementById('cancelQueueBtn').style.display = 'none';
   }
   var btns = document.querySelectorAll('.mode-main-btn');
   for (var i = 0; i < btns.length; i++) {
-    if (!btns[i] || !btns[i].textContent) continue;
-    var isActive = btns[i].textContent.toLowerCase().indexOf(mode) !== -1;
+    if (!btns[i] || !btns[i].onclick) continue;
+    var oc = btns[i].getAttribute('onclick') || '';
+    var isActive = oc.indexOf("'" + mode + "'") !== -1;
     btns[i].className = 'mode-main-btn' + (isActive ? ' active' : '');
   }
   document.getElementById('singleOptions').style.display = mode === 'single' ? 'flex' : 'none';
+  document.getElementById('local2pOptions').style.display = mode === 'local2p' ? 'flex' : 'none';
   document.getElementById('multiOptions').style.display = mode === 'multi' ? 'flex' : 'none';
-  document.getElementById('startBtn').style.display = mode === 'single' ? '' : 'none';
+  document.getElementById('startBtn').style.display = (mode === 'single' || mode === 'local2p') ? '' : 'none';
+  document.getElementById('startBtn').textContent = mode === 'local2p' ? '\u2694 START 2P' : '\u2694 FIGHT';
 }
 
 function initSupabase() {
@@ -807,13 +858,15 @@ function initSupabase() {
   //logToConsole'Supabase initialized', 'info');
 }
 
-function createRoom() {
+function createRoom(optMode) {
   initSupabase();
   if (!supabaseClient) { return; }
   playerId = 'p_' + Math.random().toString(36).substr(2, 8);
   isHost = true;
   roomCode = Math.random().toString(36).substr(2, 6).toUpperCase();
-  gameModeType = document.getElementById('gameModeSelect').value;
+  gameModeType = optMode || document.getElementById('gameModeSelect').value;
+  cancelQuickMatch();
+  document.getElementById('quickMatchBtn').style.display = 'none';
   //logToConsole'Room created: ' + roomCode + ' mode=' + gameModeType, 'info');
   document.getElementById('mpStatus').style.display = 'block';
   document.getElementById('mpStatus').textContent = 'Room: ' + roomCode + ' — Waiting for players...';
@@ -835,6 +888,8 @@ function joinRoom() {
   if (code.length < 3) { document.getElementById('mpStatus').textContent = 'Enter a valid room code'; document.getElementById('mpStatus').style.display = 'block'; return; }
   initSupabase();
   if (!supabaseClient) { return; }
+  cancelQuickMatch();
+  document.getElementById('quickMatchBtn').style.display = 'none';
   playerId = 'p_' + Math.random().toString(36).substr(2, 8);
   isHost = false;
   roomCode = code;
@@ -1051,6 +1106,7 @@ window.addEventListener('beforeunload', function() {
 });
 
 function leaveRoom() {
+  cancelQuickMatch();
   if (mpChannel) { mpChannel.send({type:'broadcast',event:'leave',payload:{player_id:playerId}}); mpChannel.unsubscribe(); mpChannel = null; }
   if (supabaseClient && roomCode) {
     supabaseClient.from('player_states').delete().eq('room_code', roomCode).eq('player_id', playerId).then(function() {});
@@ -1071,7 +1127,88 @@ function leaveRoom() {
   location.reload();
 }
 
+function joinRoomByCode(code) {
+  initSupabase();
+  if (!supabaseClient) return;
+  playerId = 'p_' + Math.random().toString(36).substr(2, 8);
+  isHost = false;
+  roomCode = code;
+  mpPlayerList = [];
+  document.getElementById('quickMatchBtn').style.display = 'none';
+  document.getElementById('cancelQueueBtn').style.display = 'none';
+  document.getElementById('mpStatus').style.display = 'block';
+  document.getElementById('mpStatus').textContent = 'Joining room ' + code + '...';
+  document.getElementById('leaveRoomBtn').style.display = 'inline-block';
+  document.getElementById('startBtn').style.display = 'none';
+  subscribeToRoom();
+  setTimeout(function() {
+    if (document.getElementById('mpStatus').textContent === 'Joining room ' + code + '...') {
+      document.getElementById('mpStatus').textContent = 'Room not found';
+    }
+  }, 5000);
+}
+
+function quickMatch() {
+  if (quickMatchSearching) return;
+  quickMatchSearching = true;
+  initSupabase();
+  if (!supabaseClient) { quickMatchSearching = false; return; }
+  document.getElementById('quickMatchBtn').style.display = 'none';
+  document.getElementById('cancelQueueBtn').style.display = 'inline-block';
+  document.getElementById('mpStatus').style.display = 'block';
+  document.getElementById('mpStatus').textContent = '🔍 Searching for opponent...';
+  var attempts = 0;
+  quickMatchTimer = setInterval(function() {
+    attempts++;
+    supabaseClient.from('rooms').select('*').eq('status', 'waiting').limit(5).then(function(resp) {
+      if (!quickMatchSearching) return;
+      if (resp.error) { return; }
+      var rooms = resp.data || [];
+      var found = null;
+      for (var i = 0; i < rooms.length; i++) {
+        if (rooms[i].host_id !== playerId) { found = rooms[i]; break; }
+      }
+      if (found) {
+        clearInterval(quickMatchTimer);
+        quickMatchTimer = null;
+        quickMatchSearching = false;
+        document.getElementById('mpStatus').textContent = 'Opponent found! Joining...';
+        joinRoomByCode(found.code);
+      } else if (attempts >= 3) {
+        clearInterval(quickMatchTimer);
+        quickMatchTimer = null;
+        quickMatchSearching = false;
+        document.getElementById('mpStatus').textContent = 'Creating room...';
+        createRoom('ffa');
+        startQuickMatchHostCheck();
+      }
+    });
+  }, 2000);
+}
+
+function cancelQuickMatch() {
+  quickMatchSearching = false;
+  if (quickMatchTimer) { clearInterval(quickMatchTimer); quickMatchTimer = null; }
+  document.getElementById('quickMatchBtn').style.display = 'inline-block';
+  document.getElementById('cancelQueueBtn').style.display = 'none';
+  document.getElementById('mpStatus').style.display = 'none';
+  document.getElementById('mpStatus').textContent = '';
+}
+
+function startQuickMatchHostCheck() {
+  var checkTimer = setInterval(function() {
+    if (!roomCode || !isHost) { clearInterval(checkTimer); return; }
+    if (mpPlayerList.length >= 2) {
+      clearInterval(checkTimer);
+      document.getElementById('mpStatus').textContent = 'Opponent joined! Starting...';
+      setTimeout(function() { mpStartGame(); }, 1500);
+    }
+  }, 1000);
+  window._qmHostCheck = checkTimer;
+}
+
 function backToLobby() {
+  cancelQuickMatch();
   if (mpChannel) { mpChannel.send({type:'broadcast',event:'leave',payload:{player_id:playerId}}); mpChannel.unsubscribe(); mpChannel = null; }
   if (supabaseClient && roomCode) {
     supabaseClient.from('player_states').delete().eq('room_code', roomCode).eq('player_id', playerId).then(function() {});
@@ -1088,6 +1225,8 @@ function backToLobby() {
   document.getElementById('mpStatus').style.display = 'none';
   document.getElementById('leaveRoomBtn').style.display = 'none';
   document.getElementById('startBtn').style.display = 'inline-block';
+  document.getElementById('quickMatchBtn').style.display = 'inline-block';
+  document.getElementById('cancelQueueBtn').style.display = 'none';
   setGameMode('single');
   var s = document.getElementById('lobbyMoneySmall');
   if (s) s.textContent = '$' + money;
@@ -1165,10 +1304,14 @@ class RobotArena {
         this.y += (dy / dist) * this.speed * 0.65;
         this.bodyAngle = Math.atan2(dy, dx);
       }
-      var pdx = player.x - this.x;
-      var pdy = player.y - this.y;
-      if (Math.sqrt(pdx*pdx + pdy*pdy) > 5) {
-        this.turretAngle = Math.atan2(pdy, pdx);
+      var tgt = player;
+      if (player2 && player2.alive() && (!player || !player.alive() || (Math.hypot(player2.x-this.x,player2.y-this.y) < Math.hypot(player.x-this.x,player.y-this.y)))) tgt = player2;
+      if (tgt && tgt.alive()) {
+        var pdx = tgt.x - this.x;
+        var pdy = tgt.y - this.y;
+        if (Math.sqrt(pdx*pdx + pdy*pdy) > 5) {
+          this.turretAngle = Math.atan2(pdy, pdx);
+        }
       }
     } else {
       var mx = 0, my = 0;
@@ -1211,6 +1354,27 @@ class RobotArena {
       if (mx !== 0 || my !== 0) this.bodyAngle = Math.atan2(my, mx);
       this.lastMx = mx;
       this.lastMy = my;
+    } else if (this === player2) {
+      var mx2 = 0, my2 = 0;
+      if (p2Keys['arrowup']) my2 = -1;
+      if (p2Keys['arrowdown']) my2 = 1;
+      if (p2Keys['arrowleft']) mx2 = -1;
+      if (p2Keys['arrowright']) mx2 = 1;
+      if (mx2 !== 0 && my2 !== 0) { mx2 *= 0.707; my2 *= 0.707; }
+      var aimDx = 0, aimDy = 0;
+      if (p2Keys['i']) aimDy = -1;
+      if (p2Keys['k']) aimDy = 1;
+      if (p2Keys['j']) aimDx = -1;
+      if (p2Keys['l']) aimDx = 1;
+      if (aimDx !== 0 || aimDy !== 0) {
+        p2AimAngle = Math.atan2(aimDy, aimDx);
+        this.turretAngle = p2AimAngle;
+      }
+      this.x += mx2 * this.speed;
+      this.y += my2 * this.speed;
+      if (mx2 !== 0 || my2 !== 0) this.bodyAngle = Math.atan2(my2, mx2);
+      this.lastMx = mx2;
+      this.lastMy = my2;
     }
     this.x = Math.max(35, Math.min(W - 35, this.x));
     this.y = Math.max(55, Math.min(H - 35, this.y));
@@ -1483,6 +1647,7 @@ function startGameMP() {
 }
 
 function startGame() {
+  loadMoney();
   var input = document.getElementById('nameInput');
   var pName = input ? input.value.trim() || "MechWarrior" : "MechWarrior";
   if (gameMode === 'multi') { startGameMP(); return; }
@@ -1514,13 +1679,30 @@ function startGame() {
     enemies.push(ai);
   }
   projectiles = []; explosions = []; particles = []; sparks = []; hitTexts = [];
-  selectedWeapon = 0; gameActive = true; canShoot = true;
-  shootCooldown = 0; comboCount = 0; comboTimer = 0; roundCount = 0; killCount = 0;
+  selectedWeapon = 0; selectedWeapon2 = 2; gameActive = true; canShoot = true; canShoot2 = true;
+  shootCooldown = 0; shootCooldown2 = 0; comboCount = 0; comboTimer = 0; roundCount = 0; killCount = 0;
   screenShake.intensity = 0;
+  // Local 2P: create player2
+  player2 = null;
+  if (gameMode === 'local2p') {
+    player2 = new RobotArena('P2', 150, 350, true);
+    player2.maxHp = 200;
+    player2.hp = 200;
+    player2.color = '#ff8844';
+    player2.tankId = 'default';
+    document.getElementById('player2HpRow').style.display = 'flex';
+    document.getElementById('p2Name').textContent = 'P2';
+  } else {
+    document.getElementById('player2HpRow').style.display = 'none';
+  }
   document.getElementById('startScreen').style.display = 'none';
   // Show/hide touch controls
   var fireBtn = document.getElementById('fireBtn');
-  if (controlMode === 'touch') {
+  if (gameMode === 'local2p') {
+    fireBtn.classList.remove('show');
+    document.getElementById('controlsHint').innerHTML = '<kbd style="color:#44aaff">W A S D</kbd> P1 move | <kbd style="color:#44aaff">Click</kbd>/<kbd style="color:#44aaff">Space</kbd> fire | <kbd style="color:#ff8844">\u2190\u2191\u2192\u2193</kbd> P2 move | <kbd style="color:#ff8844">I J K L</kbd> aim | <kbd style="color:#ff8844">.</kbd> fire';
+    document.querySelector('.weapon-bar').classList.remove('touch-mode');
+  } else if (controlMode === 'touch') {
     fireBtn.classList.add('show');
     document.getElementById('controlsHint').innerHTML = 'Joystick = drive + aim &nbsp;|&nbsp; Release = shoot &nbsp;|&nbsp; Tap = auto-aim &nbsp;|&nbsp; Red button = fire';
     document.querySelector('.weapon-bar').classList.add('touch-mode');
@@ -1563,19 +1745,38 @@ function updateWeaponBar() {
 }
 
 function selectWeapon(i) { selectedWeapon = i; updateWeaponBar(); }
+function selectWeapon2(i) { selectedWeapon2 = i; }
 
 document.addEventListener('keydown', function(e) {
   if (!e || !e.key) return;
   keys[e.key.toLowerCase()] = true;
+  if (gameMode === 'local2p') p2Keys[e.key.toLowerCase()] = true;
   var n = parseInt(e.key);
   if (n >= 1 && n <= 5) selectWeapon(n - 1);
+  // P2 weapon select: 6-9,0
+  if (gameMode === 'local2p' && player2) {
+    if (n === 6) selectWeapon2(0);
+    else if (n === 7) selectWeapon2(1);
+    else if (n === 8) selectWeapon2(2);
+    else if (n === 9) selectWeapon2(3);
+    else if (n === 0) selectWeapon2(4);
+    if (e.key === '.' || e.key === '>') {
+      e.preventDefault();
+      if (canShoot2 && player2 && player2.alive()) player2Shoot();
+    }
+  }
   if (e.key === 'e' || e.key === 'E') useAbility();
   if ((e.key === ' ' || e.key === 'Space') && gameActive && canShoot && player && player.alive()) {
     e.preventDefault();
     playerShoot();
   }
 });
-document.addEventListener('keyup', function(e) { if (e && e.key) keys[e.key.toLowerCase()] = false; });
+document.addEventListener('keyup', function(e) {
+  if (e && e.key) {
+    keys[e.key.toLowerCase()] = false;
+    if (gameMode === 'local2p') p2Keys[e.key.toLowerCase()] = false;
+  }
+});
 
 canvas.addEventListener('click', function(e) {
   if (!gameActive || !player || !player.alive() || !canShoot) return;
@@ -1648,9 +1849,33 @@ function playerShoot() {
   if (gameMode === 'multi') sendShot(player.x, player.y, angle, loadout[selectedWeapon]);
 }
 
+function player2Shoot() {
+  var loadout = [0,1,2,3,4];
+  var w = weapons[loadout[selectedWeapon2]] || weapons[2];
+  if (w.special === "defend") {
+    player2.shield = 35;
+    player2.heal(10);
+    createExplosion(player2.x, player2.y, "#44ddff", 20, false);
+    player2.shootFlash = 8;
+    canShoot2 = false;
+    shootCooldown2 = 25;
+    updateHP();
+    return;
+  }
+  var tx = player2.x + Math.cos(player2.turretAngle) * 400;
+  var ty = player2.y + Math.sin(player2.turretAngle) * 400;
+  fireProjectile(player2.x, player2.y, tx, ty, w, player2);
+  player2.shootFlash = 8;
+  canShoot2 = false;
+  shootCooldown2 = (w.special === "multi" || w.special === "burst") ? 28 : 15;
+}
+
 function getTargets(attacker) {
   if (attacker.isPlayer) return enemies;
-  return [player];
+  var targets = [];
+  if (player && player.alive()) targets.push(player);
+  if (player2 && player2.alive()) targets.push(player2);
+  return targets.length > 0 ? targets : [player];
 }
 
 function checkHit(proj) {
@@ -1755,6 +1980,7 @@ function processHits() {
       if (gameMode !== 'multi') {
         var reward = (difficulty + 1) * 1000;
         money += reward;
+        saveMoney();
         addHitText(target.x, target.y - 30, '+' + reward + '$', '#ffdd44');
       }
       updateHP();
@@ -1818,8 +2044,9 @@ function checkGameOver() {
     }
     return false;
   }
-  if (!player.alive() || allEnemiesDead()) {
-    gameActive = false; saveProfileStats();
+  var allPlayersDead = !player.alive() && (!player2 || !player2.alive());
+  if (allPlayersDead || allEnemiesDead()) {
+    gameActive = false; saveMoney(); saveProfileStats();
     setTimeout(function() {
       var overlay = document.getElementById('gameOverlay');
       var title = document.getElementById('resultTitle');
@@ -1863,6 +2090,21 @@ function updateHP() {
   var pst = document.getElementById('pStun');
   if (pst) pst.textContent = player.stunned ? '\u26A1 STUN' : '';
 
+  // Player 2 HP
+  if (player2 && gameMode === 'local2p') {
+    var pct2 = (player2.hp / player2.maxHp) * 100;
+    var pel2 = document.getElementById('p2HpBar');
+    if (pel2) {
+      pel2.style.width = Math.max(0, pct2) + '%';
+      pel2.textContent = Math.round(player2.hp);
+      pel2.className = 'hp-bar-inner ' + (pct2 > 50 ? 'hp-green' : pct2 > 25 ? 'hp-orange' : 'hp-red');
+    }
+    var p2sh = document.getElementById('p2Shield');
+    if (p2sh) p2sh.textContent = player2.shield > 0 ? ('\uD83D\uDEE1 ' + player2.shield) : '';
+    var p2st = document.getElementById('p2Stun');
+    if (p2st) p2st.textContent = player2.stunned ? '\u26A1 STUN' : '';
+  }
+
   // Rebuild enemy HP bars if enemy count changed
   if (enemies.length !== lastEnemyBarCount) {
     buildEnemyHpBars();
@@ -1898,10 +2140,22 @@ function updateAI() {
   if (gameMode === 'multi') return;
   for (var ei = 0; ei < enemies.length; ei++) {
     var ai = enemies[ei];
-    if (!ai.alive() || !player.alive()) continue;
+    var targets = [];
+    if (player && player.alive()) targets.push(player);
+    if (player2 && player2.alive()) targets.push(player2);
+    if (targets.length === 0) continue;
+    var target = targets[0];
+    var minDist = Infinity;
+    for (var ti = 0; ti < targets.length; ti++) {
+      var tdx = targets[ti].x - ai.x;
+      var tdy = targets[ti].y - ai.y;
+      var td = Math.sqrt(tdx*tdx + tdy*tdy);
+      if (td < minDist) { minDist = td; target = targets[ti]; }
+    }
+    if (!ai.alive()) continue;
     ai.aiCooldown--;
-    var dx = player.x - ai.x;
-    var dy = player.y - ai.y;
+    var dx = target.x - ai.x;
+    var dy = target.y - ai.y;
     var dist = Math.sqrt(dx * dx + dy * dy);
 
     if (dist < 120) {
@@ -1911,8 +2165,8 @@ function updateAI() {
       ai.targetX = ai.x + dx/dist * 40;
       ai.targetY = ai.y + dy/dist * 40;
     } else if (Math.random() < 0.02) {
-      ai.targetX = player.x + (Math.random() - 0.5) * 250;
-      ai.targetY = player.y + (Math.random() - 0.5) * 200;
+      ai.targetX = target.x + (Math.random() - 0.5) * 250;
+      ai.targetY = target.y + (Math.random() - 0.5) * 200;
     }
     ai.targetX = Math.max(380, Math.min(W - 30, ai.targetX));
     ai.targetY = Math.max(55, Math.min(H - 30, ai.targetY));
@@ -1920,8 +2174,8 @@ function updateAI() {
     if (ai.aiCooldown <= 0 && dist < 550) {
       var choice;
       if (ai.hp <= 25) choice = 2;
-      else if (player.hp <= 20 && Math.random() < 0.8) choice = 1;
-      else if (player.hp > 70) choice = Math.random() < 0.6 ? 0 : 4;
+      else if (target.hp <= 20 && Math.random() < 0.8) choice = 1;
+      else if (target.hp > 70) choice = Math.random() < 0.6 ? 0 : 4;
       else if (Math.random() < 0.2) choice = 3;
       else choice = Math.floor(Math.random() * 5);
 
@@ -1935,7 +2189,7 @@ function updateAI() {
       } else {
         var diffSpread = [1.5, 1.0, 0.7];
         var spread = (w.special === "multi" || w.special === "burst" ? 60 : 25) * diffSpread[difficulty];
-        fireProjectile(ai.x, ai.y, player.x + (Math.random() - 0.5) * spread, player.y + (Math.random() - 0.5) * spread, w, ai);
+        fireProjectile(ai.x, ai.y, target.x + (Math.random() - 0.5) * spread, target.y + (Math.random() - 0.5) * spread, w, ai);
         ai.shootFlash = 8;
         ai.aiCooldown = 20 + Math.random() * 30;
         if (w.special === "multi" || w.special === "burst") ai.aiCooldown += 20;
@@ -2165,11 +2419,13 @@ function gameLoop() {
 
   if (gameActive) {
     if (!canShoot) { shootCooldown--; if (shootCooldown <= 0) canShoot = true; }
+    if (!canShoot2) { shootCooldown2--; if (shootCooldown2 <= 0) canShoot2 = true; }
     if (comboTimer > 0) comboTimer--;
     if (controlMode === 'touch' && fireBtnHeld && canShoot && player && player.alive()) playerShoot();
     updateAI();
     updateProjectiles();
     player.update();
+    if (player2) player2.update();
     for (var ei = 0; ei < enemies.length; ei++) {
       if (gameMode === 'multi' && mpOpponents) {
         var isNetwork = false;
@@ -2291,6 +2547,7 @@ function gameLoop() {
   drawHitTexts();
 
   if (player && player.alive()) player.draw();
+  if (player2 && player2.alive()) player2.draw();
   for (var ei3 = 0; ei3 < enemies.length; ei3++) {
     if (enemies[ei3].alive()) {
       enemies[ei3].draw();
@@ -2365,13 +2622,17 @@ async function registerAccount() {
   initSupabase();
   if (!supabaseClient) return;
   var hash = btoa(pass);
-  var { data, error } = await supabaseClient.from('profiles').insert({ username: user, password: hash, money: 0, kills: 0, xp: 0 }).select().single();
+  var { data, error } = await supabaseClient.from('profiles').insert({ username: user, password: hash, money: 0, kills: 0, xp: 0, shop_data: '{}' }).select().single();
   if (error) {
     if (error.code === '42P01' || error.message?.includes('does not exist')) {
-      showAccountStatus('Missing table. Run in Supabase SQL Editor: CREATE TABLE profiles (id SERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL, money INTEGER DEFAULT 0, kills INTEGER DEFAULT 0, xp INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT NOW());');
+      showAccountStatus('Missing table. Run in Supabase SQL Editor: CREATE TABLE profiles (id SERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL, money INTEGER DEFAULT 0, kills INTEGER DEFAULT 0, xp INTEGER DEFAULT 0, shop_data TEXT DEFAULT \'{}\', created_at TIMESTAMP DEFAULT NOW());');
       return;
     }
     if (error.code === '23505') { showAccountStatus('Username already taken'); return; }
+    if (error.message?.includes('schema cache') || error.message?.includes('shop_data')) {
+      showAccountStatus('Missing shop_data column. Run in Supabase SQL Editor: ALTER TABLE profiles ADD COLUMN IF NOT EXISTS shop_data TEXT DEFAULT \'{}\';');
+      return;
+    }
     if (error.message?.includes('schema cache') || error.message?.includes('xp')) {
       showAccountStatus('Missing xp column. Run in Supabase SQL Editor: ALTER TABLE profiles ADD COLUMN IF NOT EXISTS xp INTEGER DEFAULT 0;');
       return;
@@ -2393,6 +2654,7 @@ async function loginAccount() {
   var { data, error } = await supabaseClient.from('profiles').select('*').eq('username', user).eq('password', hash).single();
   if (error || !data) { showAccountStatus('Invalid username or password'); return; }
   loggedInUser = user; profileId = data.id; money = data.money || 0; killCount = data.kills || 0; xp = data.xp || 0;
+  if (data.shop_data) { try { var sd = JSON.parse(data.shop_data); if (sd.ownedTanks) ownedTanks = sd.ownedTanks; if (sd.ownedWeapons) ownedWeapons = sd.ownedWeapons; if (sd.upgradeLevels) upgradeLevels = sd.upgradeLevels; if (sd.selectedTank) selectedTankId = sd.selectedTank; if (sd.lobbyLoadout) lobbyLoadout = sd.lobbyLoadout; } catch(e) {} }
   rememberDevice(user, hash);
   onLogin();
 }
@@ -2440,6 +2702,7 @@ async function tryAutoLogin() {
     var { data, error } = await supabaseClient.from('profiles').select('*').eq('username', d.user).eq('password', d.hash).single();
     if (error || !data) { try { localStorage.removeItem('rp_remember'); } catch(e) {} return; }
     loggedInUser = d.user; profileId = data.id; money = data.money || 0; killCount = data.kills || 0; xp = data.xp || 0;
+    if (data.shop_data) { try { var sd = JSON.parse(data.shop_data); if (sd.ownedTanks) ownedTanks = sd.ownedTanks; if (sd.ownedWeapons) ownedWeapons = sd.ownedWeapons; if (sd.upgradeLevels) upgradeLevels = sd.upgradeLevels; if (sd.selectedTank) selectedTankId = sd.selectedTank; if (sd.lobbyLoadout) lobbyLoadout = sd.lobbyLoadout; } catch(e) {} }
     onLogin();
   } catch(e) { try { localStorage.removeItem('rp_remember'); } catch(e2) {} }
 }
@@ -2448,7 +2711,8 @@ async function saveProfileStats() {
   var s = document.getElementById('lobbyMoneySmall');
   if (s) s.textContent = '$' + money;
   if (!profileId || !supabaseClient) return;
-  await supabaseClient.from('profiles').update({ money: money, kills: killCount, xp: xp }).eq('id', profileId);
+  var shopData = JSON.stringify({ ownedTanks: ownedTanks, selectedTank: selectedTankId, upgradeLevels: upgradeLevels, ownedWeapons: ownedWeapons, lobbyLoadout: lobbyLoadout });
+  await supabaseClient.from('profiles').update({ money: money, kills: killCount, xp: xp, shop_data: shopData }).eq('id', profileId);
   updateLobbyXp();
 }
 
@@ -2562,7 +2826,9 @@ function getShopData() {
   } catch(e) {}
 }
 function saveShopData() {
-  try { localStorage.setItem('rp_shop_' + loggedInUser, JSON.stringify({ownedTanks:ownedTanks,selectedTank:selectedTankId,upgradeLevels:upgradeLevels,ownedWeapons:ownedWeapons,lobbyLoadout:lobbyLoadout,xp:xp})); } catch(e) {}
+  try { localStorage.setItem('rp_shop_' + loggedInUser, JSON.stringify({ownedTanks:ownedTanks,selectedTank:selectedTankId,upgradeLevels:upgradeLevels,ownedWeapons:ownedWeapons,lobbyLoadout:lobbyLoadout,xp:xp,money:money})); } catch(e) {}
+  saveMoney();
+  if (profileId && supabaseClient) saveProfileStats();
 }
 
 function showShop() {
@@ -2787,7 +3053,7 @@ function getTankStats() {
   }
   return { hp: hp, speed: speed, shield: shield, dmg: dmg, color: t.color };
 }
-setTimeout(tryAutoLogin, 500);
+setTimeout(function(){ if (typeof tryAutoLogin === 'function') tryAutoLogin(); }, 500);
 </script>
 </body>
 </html>
