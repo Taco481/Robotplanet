@@ -480,8 +480,8 @@
         <div id="local2pOptions" style="display:none;width:100%;flex-direction:column;align-items:center;gap:8px">
           <div style="color:#88ffcc;font-size:12px;font-weight:bold">LOCAL 2 PLAYER</div>
           <div style="font-size:10px;color:#888;text-align:center;line-height:1.6">
-            <b style="color:#44aaff">P1:</b> WASD move | Mouse aim | Click fire<br>
-            <b style="color:#ff8844">P2:</b> Arrows move | IJKL aim | . fire<br>
+            <b style="color:#44aaff">P1:</b> WASD move | IJKL aim | Space fire<br>
+            <b style="color:#ff8844">P2:</b> Arrows move | Mouse aim | Click fire<br>
             P1: 1-5 weapon | P2: 6-0 weapon
           </div>
           <div class="lobby-row">
@@ -1324,15 +1324,9 @@ class RobotArena {
       if (p2Keys['arrowleft']) mx2 = -1;
       if (p2Keys['arrowright']) mx2 = 1;
       if (mx2 !== 0 && my2 !== 0) { mx2 *= 0.707; my2 *= 0.707; }
-      var aimDx = 0, aimDy = 0;
-      if (p2Keys['i']) aimDy = -1;
-      if (p2Keys['k']) aimDy = 1;
-      if (p2Keys['j']) aimDx = -1;
-      if (p2Keys['l']) aimDx = 1;
-      if (aimDx !== 0 || aimDy !== 0) {
-        p2AimAngle = Math.atan2(aimDy, aimDx);
-        this.turretAngle = p2AimAngle;
-      }
+      var tdx2 = mouseX - this.x;
+      var tdy2 = mouseY - this.y;
+      if (Math.sqrt(tdx2*tdx2 + tdy2*tdy2) > 5) this.turretAngle = Math.atan2(tdy2, tdx2);
       this.x += mx2 * this.speed;
       this.y += my2 * this.speed;
       if (mx2 !== 0 || my2 !== 0) this.bodyAngle = Math.atan2(my2, mx2);
@@ -1376,9 +1370,18 @@ class RobotArena {
           if (keys['arrowright']) mx = 1;
         }
         if (mx !== 0 && my !== 0) { mx *= 0.707; my *= 0.707; }
-        var tdx = mouseX - this.x;
-        var tdy = mouseY - this.y;
-        if (Math.sqrt(tdx*tdx + tdy*tdy) > 5) this.turretAngle = Math.atan2(tdy, tdx);
+        if (gameMode === 'local2p') {
+          var aimDx1 = 0, aimDy1 = 0;
+          if (keys['i']) aimDy1 = -1;
+          if (keys['k']) aimDy1 = 1;
+          if (keys['j']) aimDx1 = -1;
+          if (keys['l']) aimDx1 = 1;
+          if (aimDx1 !== 0 || aimDy1 !== 0) this.turretAngle = Math.atan2(aimDy1, aimDx1);
+        } else {
+          var tdx = mouseX - this.x;
+          var tdy = mouseY - this.y;
+          if (Math.sqrt(tdx*tdx + tdy*tdy) > 5) this.turretAngle = Math.atan2(tdy, tdx);
+        }
       }
       this.x += mx * this.speed;
       this.y += my * this.speed;
@@ -1710,7 +1713,7 @@ function startGame() {
   var fireBtn = document.getElementById('fireBtn');
   if (gameMode === 'local2p') {
     fireBtn.classList.remove('show');
-    document.getElementById('controlsHint').innerHTML = '<kbd style="color:#44aaff">W A S D</kbd> P1 move | <kbd style="color:#44aaff">Click</kbd>/<kbd style="color:#44aaff">Space</kbd> fire | <kbd style="color:#ff8844">\u2190\u2191\u2192\u2193</kbd> P2 move | <kbd style="color:#ff8844">I J K L</kbd> aim | <kbd style="color:#ff8844">.</kbd> fire';
+    document.getElementById('controlsHint').innerHTML = '<kbd style="color:#44aaff">W A S D</kbd> P1 move | <kbd style="color:#44aaff">I J K L</kbd> P1 aim | <kbd style="color:#44aaff">Space</kbd> P1 fire | <kbd style="color:#ff8844">\u2190\u2191\u2192\u2193</kbd> P2 move | <kbd style="color:#ff8844">Mouse</kbd> P2 aim | <kbd style="color:#ff8844">Click</kbd> P2 fire';
     document.querySelector('.weapon-bar').classList.remove('touch-mode');
   } else if (controlMode === 'touch') {
     fireBtn.classList.add('show');
@@ -1789,9 +1792,13 @@ document.addEventListener('keyup', function(e) {
 });
 
 canvas.addEventListener('click', function(e) {
-  if (!gameActive || !player || !player.alive() || !canShoot) return;
-  if (controlMode === 'touch') return; // touch uses fire button
-  playerShoot();
+  if (!gameActive) return;
+  if (controlMode === 'touch') return;
+  if (gameMode === 'local2p' && player2 && player2.alive() && canShoot2) {
+    player2Shoot();
+  } else if (player && player.alive() && canShoot) {
+    playerShoot();
+  }
 });
 
 // Fire button for touch
