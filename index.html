@@ -444,7 +444,6 @@
 
         <div id="modeToggle" class="mode-toggle">
           <button class="mode-main-btn active" onclick="setGameMode('single')">Singleplayer</button>
-          <button class="mode-main-btn" onclick="setGameMode('local2p')">Local 2P</button>
           <button class="mode-main-btn" onclick="setGameMode('multi')">Multiplayer</button>
         </div>
 
@@ -501,10 +500,13 @@
               <button class="diff-btn" onclick="setDifficulty(2)">Hard</button>
             </div>
           </div>
+          <button class="mp-btn secondary" onclick="setGameMode('multi')" style="font-size:11px;padding:5px 12px">← Back to Multiplayer</button>
         </div>
 
         <div id="multiOptions" style="display:none;width:100%">
           <div class="mp-actions">
+            <button class="mp-btn" onclick="setGameMode('local2p')" style="background:linear-gradient(135deg,#88ffcc,#44aa88);font-weight:bold">👥 Local 2P</button>
+            <div style="margin:6px 0;border-top:1px solid rgba(74,74,255,0.15)"></div>
             <button class="mp-btn" id="quickMatchBtn" onclick="quickMatch()" style="background:linear-gradient(135deg,#ff8844,#dd6622);font-weight:bold">⚡ Quick Match</button>
             <button class="mp-btn secondary" id="cancelQueueBtn" onclick="cancelQuickMatch()" style="display:none">✕ Cancel</button>
             <div style="margin:6px 0;border-top:1px solid rgba(74,74,255,0.15)"></div>
@@ -821,7 +823,7 @@ function balanceTeams(playerCount) {
 
 function setGameMode(mode) {
   gameMode = mode;
-  if (mode === 'single' || mode === 'local2p') {
+  if (mode === 'single') {
     cancelQuickMatch();
     mpOpponents = {}; roomCode = null; playerId = null; isHost = false;
     if (typeof mpChannel !== 'undefined' && mpChannel) { mpChannel.unsubscribe(); mpChannel = null; }
@@ -833,12 +835,14 @@ function setGameMode(mode) {
   for (var i = 0; i < btns.length; i++) {
     if (!btns[i] || !btns[i].onclick) continue;
     var oc = btns[i].getAttribute('onclick') || '';
-    var isActive = oc.indexOf("'" + mode + "'") !== -1;
+    var isActive = oc.indexOf("'single'") !== -1 ? mode === 'single' : (oc.indexOf("'multi'") !== -1 ? (mode === 'multi' || mode === 'local2p') : false);
     btns[i].className = 'mode-main-btn' + (isActive ? ' active' : '');
   }
   document.getElementById('singleOptions').style.display = mode === 'single' ? 'flex' : 'none';
   document.getElementById('local2pOptions').style.display = mode === 'local2p' ? 'flex' : 'none';
-  document.getElementById('multiOptions').style.display = mode === 'multi' ? 'flex' : 'none';
+  document.getElementById('multiOptions').style.display = (mode === 'multi' || mode === 'local2p') ? 'flex' : 'none';
+  document.getElementById('quickMatchBtn').style.display = mode === 'multi' ? 'inline-block' : 'none';
+  document.getElementById('cancelQueueBtn').style.display = 'none';
   document.getElementById('startBtn').style.display = (mode === 'single' || mode === 'local2p') ? '' : 'none';
   document.getElementById('startBtn').textContent = mode === 'local2p' ? '\u2694 START 2P' : '\u2694 FIGHT';
 }
@@ -1313,47 +1317,6 @@ class RobotArena {
           this.turretAngle = Math.atan2(pdy, pdx);
         }
       }
-    } else {
-      var mx = 0, my = 0;
-      if (controlMode === 'touch') {
-        if (joystick.active) {
-          mx = joystick.dx * joystick.dist;
-          my = joystick.dy * joystick.dist;
-        }
-        if (aimActive && aimDragged) {
-          var adx = aimX - this.x;
-          var ady = aimY - this.y;
-          if (Math.sqrt(adx*adx + ady*ady) > 5) this.turretAngle = Math.atan2(ady, adx);
-        } else {
-          var nearest = null, nearDist = Infinity;
-          for (var ei = 0; ei < enemies.length; ei++) {
-            if (!enemies[ei].alive()) continue;
-            var edx = enemies[ei].x - this.x;
-            var edy = enemies[ei].y - this.y;
-            var edist = edx*edx + edy*edy;
-            if (edist < nearDist) { nearDist = edist; nearest = enemies[ei]; }
-          }
-          if (nearest) {
-            var adx = nearest.x - this.x;
-            var ady = nearest.y - this.y;
-            this.turretAngle = Math.atan2(ady, adx);
-          }
-        }
-      } else {
-        if (keys['w'] || keys['arrowup']) my = -1;
-        if (keys['s'] || keys['arrowdown']) my = 1;
-        if (keys['a'] || keys['arrowleft']) mx = -1;
-        if (keys['d'] || keys['arrowright']) mx = 1;
-        if (mx !== 0 && my !== 0) { mx *= 0.707; my *= 0.707; }
-        var tdx = mouseX - this.x;
-        var tdy = mouseY - this.y;
-        if (Math.sqrt(tdx*tdx + tdy*tdy) > 5) this.turretAngle = Math.atan2(tdy, tdx);
-      }
-      this.x += mx * this.speed;
-      this.y += my * this.speed;
-      if (mx !== 0 || my !== 0) this.bodyAngle = Math.atan2(my, mx);
-      this.lastMx = mx;
-      this.lastMy = my;
     } else if (this === player2) {
       var mx2 = 0, my2 = 0;
       if (p2Keys['arrowup']) my2 = -1;
@@ -1375,6 +1338,47 @@ class RobotArena {
       if (mx2 !== 0 || my2 !== 0) this.bodyAngle = Math.atan2(my2, mx2);
       this.lastMx = mx2;
       this.lastMy = my2;
+    } else {
+      var mx = 0, my = 0;
+      if (controlMode === 'touch') {
+        if (joystick.active) {
+          mx = joystick.dx * joystick.dist;
+          my = joystick.dy * joystick.dist;
+        }
+        if (aimActive && aimDragged) {
+          var adx = aimX - this.x;
+          var ady = aimY - this.y;
+          if (Math.sqrt(adx*adx + ady*ady) > 5) this.turretAngle = Math.atan2(ady, adx);
+        } else {
+          var nearest = null, nearDist = Infinity;
+          for (var ei = 0; ei < enemies.length; ei++) {
+            if (!enemies[ei].alive()) continue;
+            var edx = enemies[ei].x - this.x;
+            var edy = enemies[ei].y - this.y;
+            var edist = edx*edx + edy*edy;
+            if (edist < nearDist) { nearDist = edist; nearest = enemies[ei]; }
+          }
+          if (nearest) {
+            var adx2 = nearest.x - this.x;
+            var ady2 = nearest.y - this.y;
+            this.turretAngle = Math.atan2(ady2, adx2);
+          }
+        }
+      } else {
+        if (keys['w'] || keys['arrowup']) my = -1;
+        if (keys['s'] || keys['arrowdown']) my = 1;
+        if (keys['a'] || keys['arrowleft']) mx = -1;
+        if (keys['d'] || keys['arrowright']) mx = 1;
+        if (mx !== 0 && my !== 0) { mx *= 0.707; my *= 0.707; }
+        var tdx = mouseX - this.x;
+        var tdy = mouseY - this.y;
+        if (Math.sqrt(tdx*tdx + tdy*tdy) > 5) this.turretAngle = Math.atan2(tdy, tdx);
+      }
+      this.x += mx * this.speed;
+      this.y += my * this.speed;
+      if (mx !== 0 || my !== 0) this.bodyAngle = Math.atan2(my, mx);
+      this.lastMx = mx;
+      this.lastMy = my;
     }
     this.x = Math.max(35, Math.min(W - 35, this.x));
     this.y = Math.max(55, Math.min(H - 35, this.y));
