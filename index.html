@@ -1872,7 +1872,11 @@ function startGame() {
   // Local 2P: create player2
   player2 = null;
   if (gameMode === 'local2p') {
-    player2 = new RobotArena('P2', 150, 350, true);
+    if (local2pPvP) {
+      player2 = new RobotArena('P2', 650, 250, true);
+    } else {
+      player2 = new RobotArena('P2', 150, 350, true);
+    }
     player2.maxHp = 200;
     player2.hp = 200;
     player2.color = '#ff8844';
