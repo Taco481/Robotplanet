@@ -513,6 +513,13 @@
             P1: 1-5 weapon | P2: 6-0 weapon
           </div>
           <div class="lobby-row">
+            <span class="label">Mode</span>
+            <div class="btn-group">
+              <button class="mode-btn active" id="local2pCoopBtn" onclick="setLocal2pMode('coop')">Co-op</button>
+              <button class="mode-btn" id="local2pPvpBtn" onclick="setLocal2pMode('pvp')">PvP</button>
+            </div>
+          </div>
+          <div class="lobby-row">
             <span class="label">Opponents</span>
             <div class="btn-group">
               <button class="enemy-btn" onclick="setEnemyCount(1)">1</button>
@@ -668,6 +675,7 @@ var shootCooldown = 0, shootCooldown2 = 0;
 var screenShake = { x: 0, y: 0, intensity: 0 };
 var p2AimAngle = 0;
 var local2pTouchMode = false;
+var local2pPvP = false;
 var p2Joystick = { active: false, centerX: 0, centerY: 0, dx: 0, dy: 0, dist: 0, touchId: -1 };
 var enemyCount = 1, money = 0;
 function loadMoney() { try { var m = localStorage.getItem('rp_money'); if (m !== null) money = parseInt(m) || 0; } catch(e) {} }
@@ -701,6 +709,18 @@ function setLocal2pControls(mode) {
     document.getElementById('controlsHint').innerHTML = 'Left half = P1 joystick (auto-aim) &nbsp;|&nbsp; Right half = P2 joystick (auto-aim) &nbsp;|&nbsp; Release = shoot';
   } else {
     document.getElementById('controlsHint').innerHTML = '<kbd style="color:#44aaff">W A S D</kbd> P1 move | <kbd style="color:#44aaff">I J K L</kbd> P1 aim | <kbd style="color:#44aaff">Space</kbd> P1 fire | <kbd style="color:#ff8844">\u2190\u2191\u2192\u2193</kbd> P2 move | <kbd style="color:#ff8844">Mouse</kbd> P2 aim | <kbd style="color:#ff8844">Click</kbd> P2 fire';
+  }
+}
+
+function setLocal2pMode(mode) {
+  local2pPvP = (mode === 'pvp');
+  document.getElementById('local2pCoopBtn').className = 'mode-btn' + (mode === 'coop' ? ' active' : '');
+  document.getElementById('local2pPvpBtn').className = 'mode-btn' + (mode === 'pvp' ? ' active' : '');
+  var opponents = document.querySelectorAll('#local2pOptions .enemy-btn');
+  for (var i = 0; i < opponents.length; i++) {
+    opponents[i].disabled = local2pPvP;
+    opponents[i].style.opacity = local2pPvP ? '0.4' : '1';
+    opponents[i].style.pointerEvents = local2pPvP ? 'none' : 'auto';
   }
 }
 
@@ -1456,14 +1476,18 @@ class RobotArena {
       if (mx2 !== 0 && my2 !== 0) { mx2 *= 0.707; my2 *= 0.707; }
       if (local2pTouchMode) {
         var nearest2 = null, nearDist2 = Infinity;
-        for (var ei2 = 0; ei2 < enemies.length; ei2++) {
-          if (!enemies[ei2].alive()) continue;
-          var edx2 = enemies[ei2].x - this.x;
-          var edy2 = enemies[ei2].y - this.y;
-          var edist2 = edx2*edx2 + edy2*edy2;
-          if (edist2 < nearDist2) { nearDist2 = edist2; nearest2 = enemies[ei2]; }
+        if (gameMode === 'local2p' && local2pPvP && player && player.alive()) {
+          this.turretAngle = Math.atan2(player.y - this.y, player.x - this.x);
+        } else {
+          for (var ei2 = 0; ei2 < enemies.length; ei2++) {
+            if (!enemies[ei2].alive()) continue;
+            var edx2 = enemies[ei2].x - this.x;
+            var edy2 = enemies[ei2].y - this.y;
+            var edist2 = edx2*edx2 + edy2*edy2;
+            if (edist2 < nearDist2) { nearDist2 = edist2; nearest2 = enemies[ei2]; }
+          }
+          if (nearest2) this.turretAngle = Math.atan2(nearest2.y - this.y, nearest2.x - this.x);
         }
-        if (nearest2) this.turretAngle = Math.atan2(nearest2.y - this.y, nearest2.x - this.x);
       } else {
         var tdx2 = mouseX - this.x;
         var tdy2 = mouseY - this.y;
@@ -1487,17 +1511,21 @@ class RobotArena {
           if (Math.sqrt(adx*adx + ady*ady) > 5) this.turretAngle = Math.atan2(ady, adx);
         } else {
           var nearest = null, nearDist = Infinity;
-          for (var ei = 0; ei < enemies.length; ei++) {
-            if (!enemies[ei].alive()) continue;
-            var edx = enemies[ei].x - this.x;
-            var edy = enemies[ei].y - this.y;
-            var edist = edx*edx + edy*edy;
-            if (edist < nearDist) { nearDist = edist; nearest = enemies[ei]; }
-          }
-          if (nearest) {
-            var adx2 = nearest.x - this.x;
-            var ady2 = nearest.y - this.y;
-            this.turretAngle = Math.atan2(ady2, adx2);
+          if (gameMode === 'local2p' && local2pPvP && player2 && player2.alive()) {
+            this.turretAngle = Math.atan2(player2.y - this.y, player2.x - this.x);
+          } else {
+            for (var ei = 0; ei < enemies.length; ei++) {
+              if (!enemies[ei].alive()) continue;
+              var edx = enemies[ei].x - this.x;
+              var edy = enemies[ei].y - this.y;
+              var edist = edx*edx + edy*edy;
+              if (edist < nearDist) { nearDist = edist; nearest = enemies[ei]; }
+            }
+            if (nearest) {
+              var adx2 = nearest.x - this.x;
+              var ady2 = nearest.y - this.y;
+              this.turretAngle = Math.atan2(ady2, adx2);
+            }
           }
         }
       } else {
@@ -1817,13 +1845,15 @@ function startGame() {
   player.diffDmgMult = ts.dmg;
   player.color = ts.color;
   enemies = [];
+  var pvpMode = gameMode === 'local2p' && local2pPvP;
+  var totalEnemies = pvpMode ? 0 : enemyCount;
   var diffSpeed = [0.65, 1.0, 1.35];
   var diffHp = [80, 100, 120];
   var diffCooldownBase = [35, 20, 12];
   var diffCooldownRand = [30, 30, 20];
-  var positions = getEnemyPositions(enemyCount);
+  var positions = getEnemyPositions(totalEnemies);
   var used = {};
-  for (var i = 0; i < enemyCount; i++) {
+  for (var i = 0; i < totalEnemies; i++) {
     var nameIdx;
     do { nameIdx = Math.floor(Math.random() * aiNames.length); } while (used[nameIdx]);
     used[nameIdx] = true;
@@ -1856,7 +1886,14 @@ function startGame() {
   // Show/hide touch controls
   var fireBtn = document.getElementById('fireBtn');
   var fireBtnP2 = document.getElementById('fireBtnP2');
-  if (gameMode === 'local2p' && local2pTouchMode) {
+  if (gameMode === 'local2p' && local2pPvP) {
+    fireBtn.classList.toggle('show', local2pTouchMode);
+    fireBtnP2.classList.toggle('show', local2pTouchMode);
+    document.getElementById('controlsHint').innerHTML = local2pTouchMode
+      ? 'PvP \u2694 | Left = P1 joystick | Right = P2 joystick | Release = shoot | Buttons = fire'
+      : '<b style="color:#ffcc44">PvP \u2694</b> &nbsp;P1 vs P2, no AI enemies &nbsp;|&nbsp; <kbd style="color:#44aaff">W A S D</kbd> / <kbd style="color:#44aaff">IJKL</kbd> / <kbd style="color:#44aaff">Space</kbd> P1 &nbsp;|&nbsp; <kbd style="color:#ff8844">\u2190\u2191\u2192\u2193</kbd> / <kbd style="color:#ff8844">Mouse</kbd> / <kbd style="color:#ff8844">Click</kbd> P2';
+    document.querySelector('.weapon-bar').classList.toggle('touch-mode', local2pTouchMode);
+  } else if (gameMode === 'local2p' && local2pTouchMode) {
     fireBtn.classList.add('show');
     fireBtnP2.classList.add('show');
     document.getElementById('controlsHint').innerHTML = 'Left half = P1 joystick (auto-aim) &nbsp;|&nbsp; Right half = P2 joystick (auto-aim) &nbsp;|&nbsp; Release = shoot &nbsp;|&nbsp; Buttons = fire';
@@ -1883,8 +1920,12 @@ function startGame() {
 }
 
 function buildEnemyHpBars() {
-  var n = enemies.length || 1;
   var container = document.getElementById('enemyHpRows');
+  if (gameMode === 'local2p' && local2pPvP) {
+    container.innerHTML = '';
+    return;
+  }
+  var n = enemies.length || 1;
   container.innerHTML = '';
   for (var i = 0; i < n; i++) {
     var div = document.createElement('div');
@@ -2004,6 +2045,11 @@ function playerShootAt(x, y) {
 
 function playerShootAuto() {
   if (!player) return;
+  if (gameMode === 'local2p' && local2pPvP && player2 && player2.alive()) {
+    player.turretAngle = Math.atan2(player2.y - player.y, player2.x - player.x);
+    playerShoot();
+    return;
+  }
   var nearest = null, nearDist = Infinity;
   for (var ei = 0; ei < enemies.length; ei++) {
     if (!enemies[ei].alive()) continue;
@@ -2018,6 +2064,11 @@ function playerShootAuto() {
 
 function player2ShootAuto() {
   if (!player2 || !player2.alive() || !canShoot2) return;
+  if (gameMode === 'local2p' && local2pPvP && player && player.alive()) {
+    player2.turretAngle = Math.atan2(player.y - player2.y, player.x - player2.x);
+    player2Shoot();
+    return;
+  }
   var nearest = null, nearDist = Infinity;
   for (var ei = 0; ei < enemies.length; ei++) {
     if (!enemies[ei].alive()) continue;
@@ -2080,6 +2131,12 @@ function player2Shoot() {
 }
 
 function getTargets(attacker) {
+  if (gameMode === 'local2p' && local2pPvP) {
+    var pvpTargets = [];
+    if (attacker === player && player2 && player2.alive()) pvpTargets.push(player2);
+    if (attacker === player2 && player && player.alive()) pvpTargets.push(player);
+    return pvpTargets;
+  }
   if (attacker.isPlayer) return enemies;
   var targets = [];
   if (player && player.alive()) targets.push(player);
@@ -2253,6 +2310,18 @@ function checkGameOver() {
     }
     return false;
   }
+  if (gameMode === 'local2p' && local2pPvP) {
+    if (player.alive() && player2 && !player2.alive()) {
+      return endPvpGame(player.name + ' WINS!', player.name + ' destroys the opponent!', true);
+    }
+    if (!player.alive() && player2 && player2.alive()) {
+      return endPvpGame('P2 WINS!', player2.name + ' destroys ' + player.name + '!', false);
+    }
+    if (!player.alive() && (!player2 || !player2.alive())) {
+      return endPvpGame('\u2694 DRAW', 'Both tanks destroyed...', false);
+    }
+    return false;
+  }
   var allPlayersDead = !player.alive() && (!player2 || !player2.alive());
   if (allPlayersDead || allEnemiesDead()) {
     gameActive = false; saveMoney(); saveProfileStats();
@@ -2283,6 +2352,25 @@ function checkGameOver() {
     return true;
   }
   return false;
+}
+
+function endPvpGame(titleText, msgText, p1Won) {
+  gameActive = false;
+  if (p1Won) killCount++;
+  setTimeout(function() {
+    var overlay = document.getElementById('gameOverlay');
+    var title = document.getElementById('resultTitle');
+    var msg = document.getElementById('resultMsg');
+    var rounds = document.getElementById('resultRounds');
+    if (title) {
+      title.textContent = titleText;
+      title.className = p1Won ? 'win' : 'lose';
+    }
+    if (msg) msg.textContent = msgText;
+    if (rounds) rounds.textContent = 'Battle lasted ' + Math.max(1, roundCount) + ' rounds';
+    if (overlay) overlay.classList.add('show');
+  }, 500);
+  return true;
 }
 
 function updateHP() {
