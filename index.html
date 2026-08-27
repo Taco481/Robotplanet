@@ -578,6 +578,15 @@
                 <option value="koth">King of the Hill</option>
               </select>
             </div>
+            <div class="mp-join-row" style="margin-top:6px;flex-wrap:wrap;gap:6px;justify-content:center">
+              <span style="color:#88ffcc;font-size:11px">2P Room:</span>
+              <button class="mode-btn active" id="online2pOffBtn" onclick="setOnline2p(false)">Off</button>
+              <button class="mode-btn" id="online2pOnBtn" onclick="setOnline2p(true)">On</button>
+              <span id="online2pCtrlWrap" style="display:none;gap:6px">
+                <button class="mode-btn active" id="online2pKbmBtn" onclick="setOnline2pControls('kbm')">K&amp;M</button>
+                <button class="mode-btn" id="online2pTouchBtn" onclick="setOnline2pControls('touch')">Touch</button>
+              </span>
+            </div>
             <div class="mp-player-list" id="mpPlayerList" style="margin-top:6px;color:#aaa;font:11px monospace"></div>
             <div class="mp-status" id="mpStatus" style="display:none"></div>
             <button class="mp-btn secondary" id="leaveRoomBtn" onclick="leaveRoom()" style="display:none">✕ Leave</button>
@@ -690,6 +699,8 @@ var screenShake = { x: 0, y: 0, intensity: 0 };
 var p2AimAngle = 0;
 var local2pTouchMode = false;
 var local2pPvP = false;
+var local2pOnline = false;
+var playerId2 = null;
 var p2Joystick = { active: false, centerX: 0, centerY: 0, dx: 0, dy: 0, dist: 0, touchId: -1 };
 var enemyCount = 1, money = 0;
 function loadMoney() { try { var m = localStorage.getItem('rp_money'); if (m !== null) money = parseInt(m) || 0; } catch(e) {} }
@@ -738,6 +749,35 @@ function setLocal2pMode(mode) {
   }
 }
 
+function setOnline2p(on) {
+  if (roomCode || quickMatchSearching) {
+    var st = document.getElementById('mpStatus');
+    if (st) { st.style.display = 'block'; st.textContent = 'Toggle 2P before creating/joining a room'; }
+    return;
+  }
+  local2pOnline = !!on;
+  var offB = document.getElementById('online2pOffBtn');
+  var onB = document.getElementById('online2pOnBtn');
+  if (offB) offB.className = 'mode-btn' + (on ? '' : ' active');
+  if (onB) onB.className = 'mode-btn' + (on ? ' active' : '');
+  var wrap = document.getElementById('online2pCtrlWrap');
+  if (wrap) wrap.style.display = on ? 'flex' : 'none';
+  if (!on && playerId2) playerId2 = null;
+}
+
+function setOnline2pControls(mode) {
+  local2pTouchMode = (mode === 'touch');
+  controlMode = mode;
+  var k = document.getElementById('online2pKbmBtn');
+  var t = document.getElementById('online2pTouchBtn');
+  if (k) k.className = 'mode-btn' + (mode === 'kbm' ? ' active' : '');
+  if (t) t.className = 'mode-btn' + (mode === 'touch' ? ' active' : '');
+  var lk = document.getElementById('local2pKbmBtn');
+  var lt = document.getElementById('local2pTouchBtn');
+  if (lk) lk.className = 'mode-btn' + (mode === 'kbm' ? ' active' : '');
+  if (lt) lt.className = 'mode-btn' + (mode === 'touch' ? ' active' : '');
+}
+
 // Touch handling
 canvas.addEventListener('touchstart', handleTouch, { passive: false });
 canvas.addEventListener('touchmove', handleTouch, { passive: false });
@@ -748,7 +788,7 @@ function handleTouch(e) {
   if (controlMode !== 'touch' && !local2pTouchMode) return;
   if (!gameActive) return;
   e.preventDefault();
-  if (local2pTouchMode && gameMode === 'local2p') {
+  if (local2pTouchMode && (gameMode === 'local2p' || local2pOnline)) {
     handleTouchLocal2P(e);
     return;
   }
@@ -898,7 +938,7 @@ function handleTouchEndLocal2P(e) {
 }
 
 function handleTouchEnd(e) {
-  if (local2pTouchMode && gameMode === 'local2p') {
+  if (local2pTouchMode && (gameMode === 'local2p' || local2pOnline)) {
     handleTouchEndLocal2P(e);
     return;
   }
@@ -979,11 +1019,49 @@ function balanceTeams(playerCount) {
   return playerCount;
 }
 
+function assignPlayerTeams(sorted, teamSize) {
+  var hasLinked = false;
+  for (var li = 0; li < sorted.length; li++) { if (sorted[li].linked) { hasLinked = true; break; } }
+  var teamCount = Math.max(1, Math.round(sorted.length / (teamSize || 1)));
+  var teams = {};
+  if (!hasLinked) {
+    for (var ti = 0; ti < sorted.length; ti++) teams[sorted[ti].id] = Math.floor(ti / teamSize);
+    return teams;
+  }
+  // Build indivisible groups: linked pairs always stay on the same team
+  var groups = [], used = {};
+  for (var si = 0; si < sorted.length; si++) {
+    var p = sorted[si];
+    if (used[p.id]) continue;
+    var group = [p];
+    for (var sj = 0; sj < sorted.length; sj++) {
+      var q = sorted[sj];
+      if (q.id !== p.id && !used[q.id] && ((p.linked === q.id) || (q.linked === p.id))) {
+        group.push(q);
+        break;
+      }
+    }
+    for (var gi = 0; gi < group.length; gi++) used[group[gi].id] = true;
+    groups.push(group);
+  }
+  // Place groups into the least-loaded team so team sizes stay balanced (deterministic)
+  groups.sort(function(a,b){ return b.length - a.length; });
+  var loads = [];
+  for (var gk = 0; gk < teamCount; gk++) loads[gk] = 0;
+  for (var gi2 = 0; gi2 < groups.length; gi2++) {
+    var t = 0;
+    for (var gk2 = 1; gk2 < teamCount; gk2++) { if (loads[gk2] < loads[t]) t = gk2; }
+    for (var gim = 0; gim < groups[gi2].length; gim++) teams[groups[gi2][gim].id] = t;
+    loads[t] += groups[gi2].length;
+  }
+  return teams;
+}
+
 function setGameMode(mode) {
   gameMode = mode;
   if (mode === 'single') {
     cancelQuickMatch();
-    mpOpponents = {}; roomCode = null; playerId = null; isHost = false;
+    mpOpponents = {}; roomCode = null; playerId = null; playerId2 = null; isHost = false;
     if (typeof mpChannel !== 'undefined' && mpChannel) { mpChannel.unsubscribe(); mpChannel = null; }
   } else if (mode === 'multi') {
     document.getElementById('quickMatchBtn').style.display = 'inline-block';
@@ -1027,6 +1105,7 @@ function createRoom(optMode) {
   playerId = 'p_' + Math.random().toString(36).substr(2, 8);
   isHost = true;
   roomCode = Math.random().toString(36).substr(2, 6).toUpperCase();
+  if (local2pOnline) playerId2 = 'p2_' + Math.random().toString(36).substr(2, 8);
   gameModeType = optMode || document.getElementById('gameModeSelect').value;
   cancelQuickMatch();
   document.getElementById('quickMatchBtn').style.display = 'none';
@@ -1035,7 +1114,9 @@ function createRoom(optMode) {
   document.getElementById('mpStatus').textContent = 'Room: ' + roomCode + ' — Waiting for players...';
   document.getElementById('leaveRoomBtn').style.display = 'inline-block';
   document.getElementById('startBtn').style.display = 'none';
-  mpPlayerList = [{id: playerId, name: document.getElementById('nameInput').value.trim() || "MechWarrior"}];
+  var myName = document.getElementById('nameInput').value.trim() || "MechWarrior";
+  mpPlayerList = [{id: playerId, name: myName}];
+  if (local2pOnline && playerId2) mpPlayerList.push({id: playerId2, name: myName + ' 2P', linked: playerId});
   roomCode = roomCode;
   supabaseClient.from('rooms').insert({
     code: roomCode, host_id: playerId, status: 'waiting'
@@ -1054,6 +1135,7 @@ function joinRoom() {
   cancelQuickMatch();
   document.getElementById('quickMatchBtn').style.display = 'none';
   playerId = 'p_' + Math.random().toString(36).substr(2, 8);
+  if (local2pOnline) playerId2 = 'p2_' + Math.random().toString(36).substr(2, 8);
   isHost = false;
   roomCode = code;
   mpPlayerList = [];
@@ -1078,7 +1160,7 @@ function subscribeToRoom() {
 
   mpChannel.on('broadcast', { event: 'state' }, function(msg) {
     var data = msg.payload || msg;
-    if (data.player_id === playerId) return;
+    if (data.player_id === playerId || data.player_id === playerId2) return;
     var pid = data.player_id;
     if (!mpOpponents[pid]) {
       var idx = Object.keys(mpOpponents).length + 1;
@@ -1107,7 +1189,7 @@ function subscribeToRoom() {
 
   mpChannel.on('broadcast', { event: 'shot' }, function(msg) {
     var data = msg.payload || msg;
-    if (data.player_id === playerId) return;
+    if (data.player_id === playerId || data.player_id === playerId2) return;
     var opp = mpOpponents[data.player_id];
     if (!opp) return;
     var w = weapons[data.weapon];
@@ -1121,18 +1203,18 @@ function subscribeToRoom() {
 
   mpChannel.on('broadcast', { event: 'join' }, function(msg) {
     var data = msg.payload || msg;
-    if (data.player_id === playerId) return;
+    if (data.player_id === playerId || data.player_id === playerId2) return;
     var found = false;
     for (var pi = 0; pi < mpPlayerList.length; pi++) {
       if (mpPlayerList[pi].id === data.player_id) { found = true; break; }
     }
-    if (!found) mpPlayerList.push({id: data.player_id, name: data.name || 'Player'});
+    if (!found) mpPlayerList.push({id: data.player_id, name: data.name || 'Player', linked: data.linked});
     updatePlayerListUI();
   });
 
   mpChannel.on('broadcast', { event: 'leave' }, function(msg) {
     var data = msg.payload || msg;
-    if (data.player_id === playerId) return;
+    if (data.player_id === playerId || data.player_id === playerId2) return;
     mpPlayerList = mpPlayerList.filter(function(p) { return p.id !== data.player_id; });
     updatePlayerListUI();
     if (mpOpponents[data.player_id]) {
@@ -1173,11 +1255,20 @@ function subscribeToRoom() {
       });
       var myName = document.getElementById('nameInput').value.trim() || "MechWarrior";
       if (mpPlayerList.filter(function(p){return p.id===playerId;}).length === 0) mpPlayerList.push({id: playerId, name: myName});
+      if (local2pOnline && playerId2) {
+        var p2name = myName + ' 2P';
+        if (mpPlayerList.filter(function(p){return p.id===playerId2;}).length === 0) mpPlayerList.push({id: playerId2, name: p2name, linked: playerId});
+        if (mpChannel) {
+          mpChannel.send({type:'broadcast', event:'join', payload:{player_id: playerId2, name: p2name, linked: playerId}});
+          mpChannel.send({type:'broadcast', event:'state', payload:{player_id: playerId2, name: p2name, x: 650, y: 250, hp: 200, max_hp: 200,
+            body_angle: 0, turret_angle: 0, shield: 0, stunned: false, alive: true, weapon: 0, team: 0}});
+        }
+      }
       updatePlayerListUI();
       if (mpChannel) {
         mpChannel.send({
           type: 'broadcast', event: 'join',
-          payload: { player_id: playerId, name: myName }
+          payload: { player_id: playerId, name: myName, linked: (local2pOnline && playerId2) ? playerId2 : undefined }
         });
         mpChannel.send({
           type: 'broadcast', event: 'state',
@@ -1202,11 +1293,11 @@ function updatePlayerListUI() {
   var html = '';
   for (var i = 0; i < mpPlayerList.length; i++) {
     var p = mpPlayerList[i];
-    var isMe = p.id === playerId;
+    var isMe = p.id === playerId || p.id === playerId2;
     html += '<div style="padding:4px 8px;border-radius:4px;background:' + (isMe ? 'rgba(68,255,136,0.1)' : 'rgba(255,255,255,0.05)') + '">';
     html += '<span style="font-size:12px;color:' + (isMe ? '#44ff88' : '#ccc') + '">';
     if (isMe) html += '▶ ';
-    html += (p.name || 'Player') + (isMe ? ' (you)' : '');
+    html += (p.name || 'Player') + (isMe ? (p.id === playerId ? ' (you)' : ' (P2)') : '');
     html += '</span></div>';
   }
   html += '<div style="font-size:10px;color:#666;padding:2px 8px">' + mpPlayerList.length + ' player(s)</div>';
@@ -1260,9 +1351,34 @@ function sendShot(x, y, angle, weaponIdx) {
   });
 }
 
+function upsertState2() {
+  if (!mpChannel || !player2 || !roomCode || !playerId2) return;
+  mpChannel.send({
+    type: 'broadcast', event: 'state',
+    payload: {
+      player_id: playerId2,
+      x: Math.round(player2.x), y: Math.round(player2.y),
+      hp: player2.hp, max_hp: player2.maxHp,
+      body_angle: player2.bodyAngle || 0, turret_angle: player2.turretAngle || 0,
+      shield: player2.shield || 0, stunned: player2.stunned || false,
+      alive: player2.alive(), weapon: selectedWeapon2, name: player2.name || 'Player 2',
+      team: player2.team || 0
+    }
+  });
+}
+
+function sendShot2(x, y, angle, weaponIdx) {
+  if (!mpChannel || !playerId2) return;
+  mpChannel.send({
+    type: 'broadcast', event: 'shot',
+    payload: { player_id: playerId2, x: x, y: y, angle: angle, weapon: weaponIdx }
+  });
+}
+
 window.addEventListener('beforeunload', function() {
   if (roomCode && supabaseClient) {
     supabaseClient.from('player_states').delete().eq('room_code', roomCode).eq('player_id', playerId).then(function() {});
+    if (playerId2) supabaseClient.from('player_states').delete().eq('room_code', roomCode).eq('player_id', playerId2).then(function() {});
     supabaseClient.from('rooms').delete().eq('code', roomCode).then(function() {});
   }
   if (mpChannel) mpChannel.unsubscribe();
@@ -1270,14 +1386,19 @@ window.addEventListener('beforeunload', function() {
 
 function leaveRoom() {
   cancelQuickMatch();
-  if (mpChannel) { mpChannel.send({type:'broadcast',event:'leave',payload:{player_id:playerId}}); mpChannel.unsubscribe(); mpChannel = null; }
+  if (mpChannel) {
+    mpChannel.send({type:'broadcast',event:'leave',payload:{player_id:playerId}});
+    if (playerId2) mpChannel.send({type:'broadcast',event:'leave',payload:{player_id:playerId2}});
+    mpChannel.unsubscribe(); mpChannel = null;
+  }
   if (supabaseClient && roomCode) {
     supabaseClient.from('player_states').delete().eq('room_code', roomCode).eq('player_id', playerId).then(function() {});
+    if (playerId2) supabaseClient.from('player_states').delete().eq('room_code', roomCode).eq('player_id', playerId2).then(function() {});
     if (isHost) {
       supabaseClient.from('rooms').delete().eq('code', roomCode).then(function() {});
     }
   }
-  roomCode = null; mpOpponents = {}; playerId = null; isHost = false; mpPlayerList = [];
+  roomCode = null; mpOpponents = {}; playerId = null; playerId2 = null; isHost = false; mpPlayerList = [];
   gameActive = false;
   document.getElementById('multiOptions').style.display = 'none';
   document.getElementById('singleOptions').style.display = 'flex';
@@ -1294,6 +1415,7 @@ function joinRoomByCode(code) {
   initSupabase();
   if (!supabaseClient) return;
   playerId = 'p_' + Math.random().toString(36).substr(2, 8);
+  if (local2pOnline) playerId2 = 'p2_' + Math.random().toString(36).substr(2, 8);
   isHost = false;
   roomCode = code;
   mpPlayerList = [];
@@ -1361,7 +1483,8 @@ function cancelQuickMatch() {
 function startQuickMatchHostCheck() {
   var checkTimer = setInterval(function() {
     if (!roomCode || !isHost) { clearInterval(checkTimer); return; }
-    if (mpPlayerList.length >= 2) {
+    var othersCount = mpPlayerList.filter(function(p){ return p.id !== playerId && p.id !== playerId2; }).length;
+    if (othersCount >= 1) {
       clearInterval(checkTimer);
       document.getElementById('mpStatus').textContent = 'Opponent joined! Starting...';
       setTimeout(function() { mpStartGame(); }, 1500);
@@ -1372,12 +1495,17 @@ function startQuickMatchHostCheck() {
 
 function backToLobby() {
   cancelQuickMatch();
-  if (mpChannel) { mpChannel.send({type:'broadcast',event:'leave',payload:{player_id:playerId}}); mpChannel.unsubscribe(); mpChannel = null; }
+  if (mpChannel) {
+    mpChannel.send({type:'broadcast',event:'leave',payload:{player_id:playerId}});
+    if (playerId2) mpChannel.send({type:'broadcast',event:'leave',payload:{player_id:playerId2}});
+    mpChannel.unsubscribe(); mpChannel = null;
+  }
   if (supabaseClient && roomCode) {
     supabaseClient.from('player_states').delete().eq('room_code', roomCode).eq('player_id', playerId).then(function() {});
+    if (playerId2) supabaseClient.from('player_states').delete().eq('room_code', roomCode).eq('player_id', playerId2).then(function() {});
     if (isHost) supabaseClient.from('rooms').delete().eq('code', roomCode).then(function() {});
   }
-  roomCode = null; mpOpponents = {}; playerId = null; isHost = false; mpPlayerList = [];
+  roomCode = null; mpOpponents = {}; playerId = null; playerId2 = null; isHost = false; mpPlayerList = [];
   mpDisconnectTimer = 0;
   gameActive = false;
   document.getElementById('gameOverlay').classList.remove('show');
@@ -1491,7 +1619,7 @@ class RobotArena {
       if (mx2 !== 0 && my2 !== 0) { mx2 *= 0.707; my2 *= 0.707; }
       if (local2pTouchMode) {
         var nearest2 = null, nearDist2 = Infinity;
-        if (gameMode === 'local2p' && local2pPvP && player && player.alive()) {
+        if ((gameMode === 'local2p' || local2pOnline) && local2pPvP && player && player.alive()) {
           this.turretAngle = Math.atan2(player.y - this.y, player.x - this.x);
         } else {
           for (var ei2 = 0; ei2 < enemies.length; ei2++) {
@@ -1515,7 +1643,7 @@ class RobotArena {
       this.lastMy = my2;
     } else {
       var mx = 0, my = 0;
-      if (controlMode === 'touch' || (gameMode === 'local2p' && local2pTouchMode)) {
+      if (controlMode === 'touch' || ((gameMode === 'local2p' || local2pOnline) && local2pTouchMode)) {
         if (joystick.active) {
           mx = joystick.dx * joystick.dist;
           my = joystick.dy * joystick.dist;
@@ -1548,14 +1676,14 @@ class RobotArena {
         if (keys['s']) my = 1;
         if (keys['a']) mx = -1;
         if (keys['d']) mx = 1;
-        if (gameMode !== 'local2p') {
+        if (gameMode !== 'local2p' && !local2pOnline) {
           if (keys['arrowup']) my = -1;
           if (keys['arrowdown']) my = 1;
           if (keys['arrowleft']) mx = -1;
           if (keys['arrowright']) mx = 1;
         }
         if (mx !== 0 && my !== 0) { mx *= 0.707; my *= 0.707; }
-        if (gameMode === 'local2p') {
+        if (gameMode === 'local2p' || local2pOnline) {
           var aimDx1 = 0, aimDy1 = 0;
           if (keys['i']) aimDy1 = -1;
           if (keys['k']) aimDy1 = 1;
@@ -1759,6 +1887,7 @@ function startGameMP() {
   gameModeType = gameModeType || 'ffa';
 
   // Assign teams
+  var isLocal2pOnline = local2pOnline && playerId2;
   var playerCount = mpPlayerList.length;
   var teamSize = 1;
   if (gameModeType === 'teams') {
@@ -1770,10 +1899,7 @@ function startGameMP() {
   }
   // Deterministic ordering (same on all clients): sort by player id
   var sorted = mpPlayerList.slice().sort(function(a,b){return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;});
-  playerTeams = {};
-  for (var ti = 0; ti < sorted.length; ti++) {
-    playerTeams[sorted[ti].id] = Math.floor(ti / teamSize);
-  }
+  playerTeams = assignPlayerTeams(sorted, teamSize);
 
   // Find my team and spawn
   var myTeam = playerTeams[playerId] || 0;
@@ -1792,11 +1918,12 @@ function startGameMP() {
   player.team = myTeam;
   player.color = teamColors[myTeam % teamColors.length];
 
-  // Create opponents for all other players
+  // Create opponents for all other players (skip both local ids in 2P online)
   enemies = [];
   mpOpponents = {};
   for (var oi = 0; oi < sorted.length; oi++) {
     if (sorted[oi].id === playerId) continue;
+    if (isLocal2pOnline && sorted[oi].id === playerId2) continue;
     var oid = sorted[oi].id;
     var oTeam = playerTeams[oid] || 0;
     var osp = spawnPoints[oi % spawnPoints.length];
@@ -1810,12 +1937,32 @@ function startGameMP() {
     enemies.push(opp);
   }
 
+  // Local 2nd player in an online room
+  player2 = null;
+  if (isLocal2pOnline) {
+    var myIdx2 = 0;
+    for (var mi2 = 0; mi2 < sorted.length; mi2++) {
+      if (sorted[mi2].id === playerId2) { myIdx2 = mi2; break; }
+    }
+    var sp2 = spawnPoints[myIdx2 % spawnPoints.length];
+    player2 = new RobotArena(sorted[myIdx2].name || 'P2', sp2.x, sp2.y, true);
+    player2.maxHp = ts.hp;
+    player2.hp = ts.hp;
+    player2.speed = player2.speed * ts.speed;
+    player2.shield = ts.shield;
+    player2.team = playerTeams[playerId2] || myTeam;
+    player2.color = (loggedInUser && ownedColors.indexOf(selectedP2Color) !== -1) ? selectedP2Color : '#ff8844';
+  }
+  if (player2) { document.getElementById('player2HpRow').style.display = 'flex'; document.getElementById('p2Name').textContent = player2.name || 'P2'; }
+  else document.getElementById('player2HpRow').style.display = 'none';
+
   var input = document.getElementById('nameInput');
   var pName = input ? input.value.trim() || "MechWarrior" : "MechWarrior";
 
   projectiles = []; explosions = []; particles = []; sparks = []; hitTexts = [];
   selectedWeapon = 0; gameActive = true; canShoot = true;
-  shootCooldown = 0; comboCount = 0; comboTimer = 0; roundCount = 0; killCount = 0;
+  selectedWeapon2 = 2; canShoot2 = true; shootCooldown = 0; shootCooldown2 = 0;
+  comboCount = 0; comboTimer = 0; roundCount = 0; killCount = 0;
   screenShake.intensity = 0;
 
   // Init KOTH
@@ -1830,13 +1977,25 @@ function startGameMP() {
   document.getElementById('startScreen').style.display = 'none';
   var fireBtn = document.getElementById('fireBtn');
   var fireBtnP2 = document.getElementById('fireBtnP2');
-  fireBtnP2.classList.remove('show');
-  if (controlMode === 'touch') {
+  var ctrlHint = document.getElementById('controlsHint');
+  if (local2pOnline && local2pTouchMode) {
     fireBtn.classList.add('show');
+    fireBtnP2.classList.add('show');
+    if (ctrlHint) ctrlHint.innerHTML = 'Left half = P1 joystick (auto-aim) &nbsp;|&nbsp; Right half = P2 joystick (auto-aim) &nbsp;|&nbsp; Release = shoot';
+    document.querySelector('.weapon-bar').classList.add('touch-mode');
+  } else if (local2pOnline) {
+    fireBtn.classList.remove('show');
+    fireBtnP2.classList.remove('show');
+    if (ctrlHint) ctrlHint.innerHTML = '<kbd style="color:#44aaff">W A S D</kbd> P1 move | <kbd style="color:#44aaff">I J K L</kbd> P1 aim | <kbd style="color:#44aaff">Space</kbd> P1 fire | <kbd style="color:#ff8844">\u2190\u2191\u2192\u2193</kbd> P2 move | <kbd style="color:#ff8844">Mouse</kbd> P2 aim | <kbd style="color:#ff8844">Click</kbd> P2 fire';
+    document.querySelector('.weapon-bar').classList.remove('touch-mode');
+  } else if (controlMode === 'touch') {
+    fireBtn.classList.add('show');
+    fireBtnP2.classList.remove('show');
     document.getElementById('controlsHint').innerHTML = 'Joystick = drive + aim &nbsp;|&nbsp; Release = shoot &nbsp;|&nbsp; Tap = auto-aim &nbsp;|&nbsp; Red button = fire';
     document.querySelector('.weapon-bar').classList.add('touch-mode');
   } else {
     fireBtn.classList.remove('show');
+    fireBtnP2.classList.remove('show');
     document.getElementById('controlsHint').innerHTML = '<kbd>W A S D</kbd> move &nbsp;|&nbsp; <kbd>1-5</kbd> weapon &nbsp;|&nbsp; <kbd>Click</kbd> / <kbd>Space</kbd> fire';
     document.querySelector('.weapon-bar').classList.remove('touch-mode');
   }
@@ -1844,6 +2003,7 @@ function startGameMP() {
   buildEnemyHpBars();
   updateHP();
   upsertState();
+  if (player2) upsertState2();
 }
 
 function startGame() {
@@ -1976,11 +2136,11 @@ function selectWeapon2(i) { selectedWeapon2 = i; }
 document.addEventListener('keydown', function(e) {
   if (!e || !e.key) return;
   keys[e.key.toLowerCase()] = true;
-  if (gameMode === 'local2p') p2Keys[e.key.toLowerCase()] = true;
+  if (gameMode === 'local2p' || local2pOnline) p2Keys[e.key.toLowerCase()] = true;
   var n = parseInt(e.key);
   if (n >= 1 && n <= 5) selectWeapon(n - 1);
   // P2 weapon select: 6-9,0
-  if (gameMode === 'local2p' && player2) {
+  if ((gameMode === 'local2p' || local2pOnline) && player2) {
     if (n === 6) selectWeapon2(0);
     else if (n === 7) selectWeapon2(1);
     else if (n === 8) selectWeapon2(2);
@@ -2000,14 +2160,14 @@ document.addEventListener('keydown', function(e) {
 document.addEventListener('keyup', function(e) {
   if (e && e.key) {
     keys[e.key.toLowerCase()] = false;
-    if (gameMode === 'local2p') p2Keys[e.key.toLowerCase()] = false;
+    if (gameMode === 'local2p' || local2pOnline) p2Keys[e.key.toLowerCase()] = false;
   }
 });
 
 canvas.addEventListener('click', function(e) {
   if (!gameActive) return;
   if (controlMode === 'touch') return;
-  if (gameMode === 'local2p' && player2 && player2.alive() && canShoot2) {
+  if ((gameMode === 'local2p' || local2pOnline) && player2 && player2.alive() && canShoot2) {
     player2Shoot();
   } else if (player && player.alive() && canShoot) {
     playerShoot();
@@ -2147,6 +2307,7 @@ function player2Shoot() {
   player2.shootFlash = 8;
   canShoot2 = false;
   shootCooldown2 = (w.special === "multi" || w.special === "burst") ? 28 : 15;
+  if (gameMode === 'multi') sendShot2(player2.x, player2.y, player2.turretAngle, loadout[selectedWeapon2]);
 }
 
 function getTargets(attacker) {
@@ -2293,7 +2454,7 @@ function checkGameOver() {
   var allDead = allEnemiesDead();
   if (gameMode === 'multi') {
     // N-player multiplayer: last player/team standing
-    if (!player.alive()) {
+    if (!player.alive() && (!player2 || !player2.alive())) {
       gameActive = false; saveProfileStats();
       setTimeout(function() {
         var t = document.getElementById('resultTitle');
@@ -2407,7 +2568,7 @@ function updateHP() {
   if (pst) pst.textContent = player.stunned ? '\u26A1 STUN' : '';
 
   // Player 2 HP
-  if (player2 && gameMode === 'local2p') {
+  if (player2 && (gameMode === 'local2p' || local2pOnline)) {
     var pct2 = (player2.hp / player2.maxHp) * 100;
     var pel2 = document.getElementById('p2HpBar');
     if (pel2) {
@@ -2597,7 +2758,7 @@ function drawHUD() {
 }
 
 function drawJoystick() {
-  if (local2pTouchMode && gameMode === 'local2p') {
+  if (local2pTouchMode && (gameMode === 'local2p' || local2pOnline)) {
     drawJoystickSingle(joystick, '#ff5555');
     drawJoystickSingle(p2Joystick, '#ffaa44');
     return;
@@ -2753,7 +2914,7 @@ function gameLoop() {
     if (!canShoot2) { shootCooldown2--; if (shootCooldown2 <= 0) canShoot2 = true; }
     if (comboTimer > 0) comboTimer--;
     if (controlMode === 'touch' && fireBtnHeld && canShoot && player && player.alive()) playerShoot();
-    if (local2pTouchMode && gameMode === 'local2p' && fireBtn2Held && canShoot2 && player2 && player2.alive()) player2Shoot();
+    if (local2pTouchMode && (gameMode === 'local2p' || local2pOnline) && fireBtn2Held && canShoot2 && player2 && player2.alive()) player2Shoot();
     updateAI();
     updateProjectiles();
     player.update();
@@ -2787,9 +2948,12 @@ function gameLoop() {
         }
       }
     }
-    if (gameMode === 'multi' && player && player.alive() && mpChannel) {
+    if (gameMode === 'multi' && mpChannel && ((player && player.alive()) || (player2 && player2.alive()))) {
       mpStateSendCounter = (mpStateSendCounter || 0) + 1;
-      if (mpStateSendCounter % 3 === 0) upsertState();
+      if (mpStateSendCounter % 3 === 0) {
+        if (player && player.alive()) upsertState();
+        if (player2 && player2.alive()) upsertState2();
+      }
       if (mpStateSendCounter % 180 === 0) upsertStateDB();
     }
     // Disconnect detection per opponent
@@ -2812,6 +2976,10 @@ function gameLoop() {
       if (player && player.alive()) {
         var pDist = Math.hypot(player.x - kx, player.y - ky);
         if (pDist < kr) playersInHill.push({id: playerId, team: player.team || 0});
+      }
+      if (player2 && player2.alive()) {
+        var p2Dist = Math.hypot(player2.x - kx, player2.y - ky);
+        if (p2Dist < kr) playersInHill.push({id: playerId2 || 'p2', team: player2.team || 0});
       }
       for (var khId in mpOpponents) {
         if (mpOpponents.hasOwnProperty(khId)) {
@@ -2903,7 +3071,7 @@ function gameLoop() {
 
   if (gameActive) drawHUD();
   ctx.restore();
-  if ((controlMode === 'touch' || (local2pTouchMode && gameMode === 'local2p')) && (joystick.active || p2Joystick.active)) drawJoystick();
+  if ((controlMode === 'touch' || (local2pTouchMode && (gameMode === 'local2p' || local2pOnline))) && (joystick.active || p2Joystick.active)) drawJoystick();
   updateHP();
   requestAnimationFrame(gameLoop);
 }
