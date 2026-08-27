@@ -191,6 +191,32 @@
   #fireBtn:active { transform: scale(0.9); background: rgba(255,0,0,0.9); }
   #fireBtn.show { display: flex; }
 
+  #fireBtnP2 {
+    position: absolute;
+    bottom: 15px;
+    left: 15px;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: rgba(255,140,0,0.7);
+    border: 3px solid rgba(255,180,80,0.9);
+    color: #fff;
+    font-size: 11px;
+    font-weight: bold;
+    font-family: inherit;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 3;
+    box-shadow: 0 0 25px rgba(255,140,0,0.4);
+    touch-action: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  #fireBtnP2:active { transform: scale(0.9); background: rgba(255,140,0,0.9); }
+  #fireBtnP2.show { display: flex; }
+
   .canvas-wrap { position: relative; width: 100%; max-width: 800px; aspect-ratio: 800 / 500; }
   .overlay {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -433,6 +459,7 @@
     <div class="combo-display" id="comboDisplay"></div>
     <div class="money-display" id="moneyDisplay">$0</div>
     <button id="fireBtn">🔥<br>FIRE</button>
+    <button id="fireBtnP2">🔥<br>P2</button>
     <div class="start-screen" id="startScreen">
       <div class="lobby-header">
         <h1><span class="bolt">⚡</span> ROBOTPLANET</h1>
@@ -482,6 +509,7 @@
           <div style="font-size:10px;color:#888;text-align:center;line-height:1.6">
             <b style="color:#44aaff">P1:</b> WASD move | IJKL aim | Space fire<br>
             <b style="color:#ff8844">P2:</b> Arrows move | Mouse aim | Click fire<br>
+            Touch: left half P1 | right half P2 joystick<br>
             P1: 1-5 weapon | P2: 6-0 weapon
           </div>
           <div class="lobby-row">
@@ -498,6 +526,13 @@
               <button class="diff-btn active" onclick="setDifficulty(0)">Easy</button>
               <button class="diff-btn" onclick="setDifficulty(1)">Normal</button>
               <button class="diff-btn" onclick="setDifficulty(2)">Hard</button>
+            </div>
+          </div>
+          <div class="lobby-row">
+            <span class="label">Controls</span>
+            <div class="btn-group">
+              <button class="mode-btn active" id="local2pKbmBtn" onclick="setLocal2pControls('kbm')">K&amp;M</button>
+              <button class="mode-btn" id="local2pTouchBtn" onclick="setLocal2pControls('touch')">Touch</button>
             </div>
           </div>
           <button class="mp-btn secondary" onclick="setGameMode('multi')" style="font-size:11px;padding:5px 12px">← Back to Multiplayer</button>
@@ -632,6 +667,8 @@ var gameActive = false, canShoot = true, canShoot2 = true;
 var shootCooldown = 0, shootCooldown2 = 0;
 var screenShake = { x: 0, y: 0, intensity: 0 };
 var p2AimAngle = 0;
+var local2pTouchMode = false;
+var p2Joystick = { active: false, centerX: 0, centerY: 0, dx: 0, dy: 0, dist: 0, touchId: -1 };
 var enemyCount = 1, money = 0;
 function loadMoney() { try { var m = localStorage.getItem('rp_money'); if (m !== null) money = parseInt(m) || 0; } catch(e) {} }
 function saveMoney() { try { localStorage.setItem('rp_money', money); } catch(e) {} }
@@ -640,7 +677,7 @@ setInterval(function(){ updateLobbyMoney(); }, 500);
 var controlMode = 'kbm';
 var joystick = { active: false, centerX: 0, centerY: 0, dx: 0, dy: 0, dist: 0, touchId: -1 };
 var aimActive = false, aimDragged = false, aimX = 0, aimY = 0, aimTouchId = -1;
-var mouseX = 0, mouseY = 0, fireBtnHeld = false;
+var mouseX = 0, mouseY = 0, fireBtnHeld = false, fireBtn2Held = false;
 
 document.addEventListener('mousemove', function(e) {
   var rect = canvas.getBoundingClientRect();
@@ -650,9 +687,20 @@ document.addEventListener('mousemove', function(e) {
 
 function setControlMode(mode) {
   controlMode = mode;
-  var btns = document.querySelectorAll('.mode-btn');
+  var btns = document.querySelectorAll('#singleOptions .mode-btn');
   for (var i = 0; i < btns.length; i++) {
     btns[i].className = 'mode-btn' + (btns[i].getAttribute('onclick').indexOf("'" + mode + "'") !== -1 ? ' active' : '');
+  }
+}
+
+function setLocal2pControls(mode) {
+  local2pTouchMode = (mode === 'touch');
+  document.getElementById('local2pKbmBtn').className = 'mode-btn' + (mode === 'kbm' ? ' active' : '');
+  document.getElementById('local2pTouchBtn').className = 'mode-btn' + (mode === 'touch' ? ' active' : '');
+  if (local2pTouchMode) {
+    document.getElementById('controlsHint').innerHTML = 'Left half = P1 joystick (auto-aim) &nbsp;|&nbsp; Right half = P2 joystick (auto-aim) &nbsp;|&nbsp; Release = shoot';
+  } else {
+    document.getElementById('controlsHint').innerHTML = '<kbd style="color:#44aaff">W A S D</kbd> P1 move | <kbd style="color:#44aaff">I J K L</kbd> P1 aim | <kbd style="color:#44aaff">Space</kbd> P1 fire | <kbd style="color:#ff8844">\u2190\u2191\u2192\u2193</kbd> P2 move | <kbd style="color:#ff8844">Mouse</kbd> P2 aim | <kbd style="color:#ff8844">Click</kbd> P2 fire';
   }
 }
 
@@ -663,8 +711,13 @@ canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
 canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
 
 function handleTouch(e) {
-  if (controlMode !== 'touch' || !gameActive) return;
+  if (controlMode !== 'touch' && !local2pTouchMode) return;
+  if (!gameActive) return;
   e.preventDefault();
+  if (local2pTouchMode && gameMode === 'local2p') {
+    handleTouchLocal2P(e);
+    return;
+  }
   var rect = canvas.getBoundingClientRect();
   var scaleX = canvas.width / rect.width;
   var scaleY = canvas.height / rect.height;
@@ -743,7 +796,78 @@ function handleTouch(e) {
   }
 }
 
+function handleTouchLocal2P(e) {
+  var rect = canvas.getBoundingClientRect();
+  var scaleX = canvas.width / rect.width;
+  var scaleY = canvas.height / rect.height;
+  var p1Active = false, p2Active = false;
+  for (var i = 0; i < e.touches.length; i++) {
+    var t = e.touches[i];
+    var tx = (t.clientX - rect.left) * scaleX;
+    var ty = (t.clientY - rect.top) * scaleY;
+    if (tx <= canvas.width * 0.5) {
+      p1Active = true;
+      if (t.identifier !== joystick.touchId) {
+        joystick.active = true;
+        joystick.centerX = tx;
+        joystick.centerY = ty;
+        joystick.dx = 0; joystick.dy = 0; joystick.dist = 0;
+        joystick.touchId = t.identifier;
+      } else {
+        var ddx = tx - joystick.centerX;
+        var ddy = ty - joystick.centerY;
+        var dist = Math.sqrt(ddx*ddx + ddy*ddy);
+        var maxDist = 60;
+        var clamped = Math.min(dist, maxDist);
+        joystick.dist = clamped / maxDist;
+        if (dist > 5) { joystick.dx = ddx / dist; joystick.dy = ddy / dist; }
+        else { joystick.dx = 0; joystick.dy = 0; }
+      }
+    } else {
+      p2Active = true;
+      if (t.identifier !== p2Joystick.touchId) {
+        p2Joystick.active = true;
+        p2Joystick.centerX = tx;
+        p2Joystick.centerY = ty;
+        p2Joystick.dx = 0; p2Joystick.dy = 0; p2Joystick.dist = 0;
+        p2Joystick.touchId = t.identifier;
+      } else {
+        var ddx2 = tx - p2Joystick.centerX;
+        var ddy2 = ty - p2Joystick.centerY;
+        var dist2 = Math.sqrt(ddx2*ddx2 + ddy2*ddy2);
+        var maxDist2 = 60;
+        var clamped2 = Math.min(dist2, maxDist2);
+        p2Joystick.dist = clamped2 / maxDist2;
+        if (dist2 > 5) { p2Joystick.dx = ddx2 / dist2; p2Joystick.dy = ddy2 / dist2; }
+        else { p2Joystick.dx = 0; p2Joystick.dy = 0; }
+      }
+    }
+  }
+  if (!p1Active) { joystick.active = false; joystick.dx = 0; joystick.dy = 0; joystick.dist = 0; joystick.touchId = -1; }
+  if (!p2Active) { p2Joystick.active = false; p2Joystick.dx = 0; p2Joystick.dy = 0; p2Joystick.dist = 0; p2Joystick.touchId = -1; }
+}
+
+function handleTouchEndLocal2P(e) {
+  for (var ci = 0; ci < e.changedTouches.length; ci++) {
+    if (e.changedTouches[ci].identifier === joystick.touchId && joystick.active) {
+      playerShootAuto();
+      joystick.active = false; joystick.dx = 0; joystick.dy = 0; joystick.dist = 0; joystick.touchId = -1;
+    }
+    if (e.changedTouches[ci].identifier === p2Joystick.touchId && p2Joystick.active) {
+      player2ShootAuto();
+      p2Joystick.active = false; p2Joystick.dx = 0; p2Joystick.dy = 0; p2Joystick.dist = 0; p2Joystick.touchId = -1;
+    }
+  }
+  if (e.touches.length > 0) {
+    handleTouchLocal2P(e);
+  }
+}
+
 function handleTouchEnd(e) {
+  if (local2pTouchMode && gameMode === 'local2p') {
+    handleTouchEndLocal2P(e);
+    return;
+  }
   if (controlMode !== 'touch') return;
   // Check if JOYSTICK touch ended — fire in joystick direction
   for (var ci = 0; ci < e.changedTouches.length; ci++) {
@@ -1319,14 +1443,32 @@ class RobotArena {
       }
     } else if (this === player2) {
       var mx2 = 0, my2 = 0;
+      if (local2pTouchMode) {
+        if (p2Joystick.active) {
+          mx2 = p2Joystick.dx * p2Joystick.dist;
+          my2 = p2Joystick.dy * p2Joystick.dist;
+        }
+      }
       if (p2Keys['arrowup']) my2 = -1;
       if (p2Keys['arrowdown']) my2 = 1;
       if (p2Keys['arrowleft']) mx2 = -1;
       if (p2Keys['arrowright']) mx2 = 1;
       if (mx2 !== 0 && my2 !== 0) { mx2 *= 0.707; my2 *= 0.707; }
-      var tdx2 = mouseX - this.x;
-      var tdy2 = mouseY - this.y;
-      if (Math.sqrt(tdx2*tdx2 + tdy2*tdy2) > 5) this.turretAngle = Math.atan2(tdy2, tdx2);
+      if (local2pTouchMode) {
+        var nearest2 = null, nearDist2 = Infinity;
+        for (var ei2 = 0; ei2 < enemies.length; ei2++) {
+          if (!enemies[ei2].alive()) continue;
+          var edx2 = enemies[ei2].x - this.x;
+          var edy2 = enemies[ei2].y - this.y;
+          var edist2 = edx2*edx2 + edy2*edy2;
+          if (edist2 < nearDist2) { nearDist2 = edist2; nearest2 = enemies[ei2]; }
+        }
+        if (nearest2) this.turretAngle = Math.atan2(nearest2.y - this.y, nearest2.x - this.x);
+      } else {
+        var tdx2 = mouseX - this.x;
+        var tdy2 = mouseY - this.y;
+        if (Math.sqrt(tdx2*tdx2 + tdy2*tdy2) > 5) this.turretAngle = Math.atan2(tdy2, tdx2);
+      }
       this.x += mx2 * this.speed;
       this.y += my2 * this.speed;
       if (mx2 !== 0 || my2 !== 0) this.bodyAngle = Math.atan2(my2, mx2);
@@ -1334,7 +1476,7 @@ class RobotArena {
       this.lastMy = my2;
     } else {
       var mx = 0, my = 0;
-      if (controlMode === 'touch') {
+      if (controlMode === 'touch' || (gameMode === 'local2p' && local2pTouchMode)) {
         if (joystick.active) {
           mx = joystick.dx * joystick.dist;
           my = joystick.dy * joystick.dist;
@@ -1644,6 +1786,8 @@ function startGameMP() {
 
   document.getElementById('startScreen').style.display = 'none';
   var fireBtn = document.getElementById('fireBtn');
+  var fireBtnP2 = document.getElementById('fireBtnP2');
+  fireBtnP2.classList.remove('show');
   if (controlMode === 'touch') {
     fireBtn.classList.add('show');
     document.getElementById('controlsHint').innerHTML = 'Joystick = drive + aim &nbsp;|&nbsp; Release = shoot &nbsp;|&nbsp; Tap = auto-aim &nbsp;|&nbsp; Red button = fire';
@@ -1711,16 +1855,25 @@ function startGame() {
   document.getElementById('startScreen').style.display = 'none';
   // Show/hide touch controls
   var fireBtn = document.getElementById('fireBtn');
-  if (gameMode === 'local2p') {
+  var fireBtnP2 = document.getElementById('fireBtnP2');
+  if (gameMode === 'local2p' && local2pTouchMode) {
+    fireBtn.classList.add('show');
+    fireBtnP2.classList.add('show');
+    document.getElementById('controlsHint').innerHTML = 'Left half = P1 joystick (auto-aim) &nbsp;|&nbsp; Right half = P2 joystick (auto-aim) &nbsp;|&nbsp; Release = shoot &nbsp;|&nbsp; Buttons = fire';
+    document.querySelector('.weapon-bar').classList.add('touch-mode');
+  } else if (gameMode === 'local2p') {
     fireBtn.classList.remove('show');
+    fireBtnP2.classList.remove('show');
     document.getElementById('controlsHint').innerHTML = '<kbd style="color:#44aaff">W A S D</kbd> P1 move | <kbd style="color:#44aaff">I J K L</kbd> P1 aim | <kbd style="color:#44aaff">Space</kbd> P1 fire | <kbd style="color:#ff8844">\u2190\u2191\u2192\u2193</kbd> P2 move | <kbd style="color:#ff8844">Mouse</kbd> P2 aim | <kbd style="color:#ff8844">Click</kbd> P2 fire';
     document.querySelector('.weapon-bar').classList.remove('touch-mode');
   } else if (controlMode === 'touch') {
     fireBtn.classList.add('show');
+    fireBtnP2.classList.remove('show');
     document.getElementById('controlsHint').innerHTML = 'Joystick = drive + aim &nbsp;|&nbsp; Release = shoot &nbsp;|&nbsp; Tap = auto-aim &nbsp;|&nbsp; Red button = fire';
     document.querySelector('.weapon-bar').classList.add('touch-mode');
   } else {
     fireBtn.classList.remove('show');
+    fireBtnP2.classList.remove('show');
     document.getElementById('controlsHint').innerHTML = '<kbd>W A S D</kbd> move &nbsp;|&nbsp; <kbd>1-5</kbd> weapon &nbsp;|&nbsp; <kbd>Click</kbd> / <kbd>Space</kbd> fire';
     document.querySelector('.weapon-bar').classList.remove('touch-mode');
   }
@@ -1821,6 +1974,29 @@ document.getElementById('fireBtn').addEventListener('mouseup', function(e) {
   fireBtnHeld = false;
 });
 
+// P2 fire button for touch
+document.getElementById('fireBtnP2').addEventListener('touchstart', function(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  fireBtn2Held = true;
+  if (gameActive && player2 && player2.alive() && canShoot2) player2Shoot();
+}, { passive: false });
+document.getElementById('fireBtnP2').addEventListener('touchend', function(e) {
+  e.preventDefault();
+  fireBtn2Held = false;
+});
+document.getElementById('fireBtnP2').addEventListener('touchcancel', function(e) {
+  e.preventDefault();
+  fireBtn2Held = false;
+});
+document.getElementById('fireBtnP2').addEventListener('mousedown', function(e) {
+  fireBtn2Held = true;
+  if (gameActive && player2 && player2.alive() && canShoot2) player2Shoot();
+});
+document.getElementById('fireBtnP2').addEventListener('mouseup', function(e) {
+  fireBtn2Held = false;
+});
+
 function playerShootAt(x, y) {
   mouseX = x; mouseY = y;
   playerShoot();
@@ -1838,6 +2014,22 @@ function playerShootAuto() {
   }
   if (nearest) { mouseX = nearest.x; mouseY = nearest.y; }
   playerShoot();
+}
+
+function player2ShootAuto() {
+  if (!player2 || !player2.alive() || !canShoot2) return;
+  var nearest = null, nearDist = Infinity;
+  for (var ei = 0; ei < enemies.length; ei++) {
+    if (!enemies[ei].alive()) continue;
+    var dx = enemies[ei].x - player2.x;
+    var dy = enemies[ei].y - player2.y;
+    var d = dx*dx + dy*dy;
+    if (d < nearDist) { nearDist = d; nearest = enemies[ei]; }
+  }
+  if (nearest) {
+    player2.turretAngle = Math.atan2(nearest.y - player2.y, nearest.x - player2.x);
+  }
+  player2Shoot();
 }
 
 // Fire button auto-fire in game loop
@@ -2298,18 +2490,33 @@ function drawHUD() {
 }
 
 function drawJoystick() {
-  var cx = joystick.centerX, cy = joystick.centerY;
+  if (local2pTouchMode && gameMode === 'local2p') {
+    drawJoystickSingle(joystick, '#ff5555');
+    drawJoystickSingle(p2Joystick, '#ffaa44');
+    return;
+  }
+  drawJoystickSingle(joystick, '#ffffff');
+}
+
+function drawJoystickSingle(stick, color) {
+  if (!stick.active) return;
+  var cx = stick.centerX, cy = stick.centerY;
   var maxDist = 60;
-  var knobX = cx + joystick.dx * maxDist * joystick.dist;
-  var knobY = cy + joystick.dy * maxDist * joystick.dist;
+  var knobX = cx + stick.dx * maxDist * stick.dist;
+  var knobY = cy + stick.dy * maxDist * stick.dist;
+  ctx.save();
+  ctx.globalAlpha = 0.5;
   ctx.fillStyle = 'rgba(255,255,255,0.08)';
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = 0.4;
   ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(cx, cy, 50, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = color;
   ctx.beginPath(); ctx.arc(knobX, knobY, 18, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.fillStyle = '#ffffff';
   ctx.beginPath(); ctx.arc(knobX, knobY, 8, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
 }
 
 function drawArena() {
@@ -2439,6 +2646,7 @@ function gameLoop() {
     if (!canShoot2) { shootCooldown2--; if (shootCooldown2 <= 0) canShoot2 = true; }
     if (comboTimer > 0) comboTimer--;
     if (controlMode === 'touch' && fireBtnHeld && canShoot && player && player.alive()) playerShoot();
+    if (local2pTouchMode && gameMode === 'local2p' && fireBtn2Held && canShoot2 && player2 && player2.alive()) player2Shoot();
     updateAI();
     updateProjectiles();
     player.update();
@@ -2588,7 +2796,7 @@ function gameLoop() {
 
   if (gameActive) drawHUD();
   ctx.restore();
-  if (controlMode === 'touch' && joystick.active) drawJoystick();
+  if ((controlMode === 'touch' || (local2pTouchMode && gameMode === 'local2p')) && (joystick.active || p2Joystick.active)) drawJoystick();
   updateHP();
   requestAnimationFrame(gameLoop);
 }
