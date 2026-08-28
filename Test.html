@@ -248,6 +248,21 @@
     z-index: 15; overflow-y: auto; padding: 10px; box-sizing: border-box;
   }
   .shop-overlay.show { opacity: 1; pointer-events: all; }
+  .admin-overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    display: flex; flex-direction: column; align-items: center;
+    background: rgba(5,5,20,0.97); border-radius: 12px;
+    opacity: 0; pointer-events: none; transition: opacity 0.3s;
+    z-index: 20; overflow-y: auto; padding: 10px; box-sizing: border-box;
+  }
+  .admin-overlay.show { opacity: 1; pointer-events: all; }
+  .admin-panel { width: min(680px, 96vw); max-width: 680px; }
+  .admin-input {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px; color: #fff; padding: 5px 8px; font-size: 11px; font-family: monospace; outline: none;
+  }
+  .admin-input:focus { border-color: #4a4aff; }
+  .admin-sec { margin: 10px 0 0 0; border-top: 1px solid rgba(74,74,255,0.15); padding-top: 10px; text-align: left; }
   .shop-overlay h2 { color: #ffdd44; font-size: 22px; margin: 4px 0; }
   .shop-overlay .shop-money { color: #ffdd44; font-size: 14px; margin-bottom: 6px; }
   .shop-overlay .shop-tabs { display: flex; gap: 4px; margin-bottom: 8px; }
@@ -649,8 +664,63 @@
         </div>
       </div>
 
-      <div class="lobby-footer">ROBOTPLANET v1.0</div>
+      <div class="lobby-footer">ROBOTPLANET v1.0 <button class="acc-btn" onclick="showAdminLogin()" style="font-size:9px;padding:2px 6px;margin-left:10px">⚙ DEV</button></div>
     </div>
+    <div class="admin-overlay" id="adminOverlay">
+      <div class="admin-panel">
+        <div class="mp-actions" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+          <span style="color:#ff8855;font-weight:bold;font-size:15px">⚙ DEV ADMIN PANEL</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span id="adminDeviceLabel" style="color:#888;font-size:10px"></span>
+            <button class="acc-btn" onclick="closeAdminPanel()" style="font-size:10px;padding:2px 8px">✕</button>
+          </div>
+        </div>
+
+        <div class="admin-sec">
+          <span class="label" style="color:#ff8888">⛔ BLOCK DEVICES</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+            <input id="blockDeviceId" class="admin-input" placeholder="device id" style="flex:1;min-width:140px">
+            <input id="blockReason" class="admin-input" placeholder="reason" style="flex:1;min-width:100px">
+            <button class="mp-btn" onclick="adminBlockDevice()" style="font-size:11px;padding:5px 12px">⛔ Block</button>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+            <button class="mp-btn secondary" style="font-size:10px;padding:3px 10px" onclick="adminBlockThisDevice()">Block THIS device</button>
+            <button class="mp-btn secondary" style="font-size:10px;padding:3px 10px" onclick="adminCopyDeviceId()">Copy device id</button>
+          </div>
+          <div id="blockedList" style="font-size:10px;color:#aaa;margin-top:6px;max-height:140px;overflow-y:auto"></div>
+        </div>
+
+        <div class="admin-sec">
+          <span class="label" style="color:#ff8888">🗑 RESET ACCOUNT</span>
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <input id="adminResetUser" class="admin-input" placeholder="username" style="flex:1">
+            <button class="mp-btn" onclick="adminResetAccount()" style="font-size:11px;padding:5px 12px;background:rgba(255,80,80,0.3);box-shadow:none">Reset</button>
+          </div>
+        </div>
+
+        <div class="admin-sec">
+          <span class="label" style="color:#88ff88">💵 GIVE / SET MONEY</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+            <input id="adminMoneyUser" class="admin-input" placeholder="username" style="flex:1;min-width:110px">
+            <input id="adminMoneyAmount" class="admin-input" type="number" placeholder="amount" style="width:100px">
+            <button class="mp-btn" onclick="adminGiveMoney(1)" style="font-size:11px;padding:5px 12px">+ Give</button>
+            <button class="mp-btn secondary" onclick="adminGiveMoney(0)" style="font-size:11px;padding:5px 12px">= Set</button>
+          </div>
+        </div>
+
+        <div class="admin-sec">
+          <span class="label" style="color:#ffaa44">⚠ ERROR LOG <span id="errCount" style="color:#ff8844"></span></span>
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <button class="mp-btn secondary" style="font-size:10px;padding:3px 10px" onclick="adminResetErrorLog()">Clear log</button>
+            <button class="mp-btn secondary" style="font-size:10px;padding:3px 10px" onclick="adminExportErrors()">Export .txt</button>
+          </div>
+          <div id="errorLogList" style="font-size:9px;font-family:monospace;color:#ffaa88;max-height:220px;overflow-y:auto;background:rgba(255,0,0,0.06);border:1px solid rgba(255,80,80,0.2);border-radius:6px;padding:6px;margin-top:6px;text-align:left"></div>
+        </div>
+
+        <div style="margin-top:14px;font-size:9px;color:#666">Apparaten krijgen een lokaal gegenereerde ID (per browser). Blokkades gelden op deze browser en in de admin_blocks-tabel.</div>
+      </div>
+    </div>
+
     <div class="overlay" id="gameOverlay">
       <h1 id="resultTitle">VICTORY</h1>
       <p id="resultMsg"></p>
@@ -2273,6 +2343,7 @@ function startCampaign() {
 }
 
 function startGame() {
+  if (checkDeviceBlocked()) return;
   loadMoney();
   var input = document.getElementById('nameInput');
   var pName = input ? input.value.trim() || "MechWarrior" : "MechWarrior";
@@ -3750,6 +3821,239 @@ async function resetAccount() {
   updateLobbyWeapons();
   alert('Account "' + uname + '" reset. You can now register again.');
 }
+
+// ---- DEV ADMIN PANEL ----
+var ADMIN_PASS = 'Tala-1802';
+function adminAuthed() { try { return sessionStorage.getItem('rp_admin_auth') === '1'; } catch(e) { return false; } }
+function showAdminLogin() {
+  if (adminAuthed()) { openAdminPanel(); return; }
+  var pass = prompt('Admin password:');
+  if (pass === null) return;
+  if (pass === ADMIN_PASS) {
+    try { sessionStorage.setItem('rp_admin_auth', '1'); } catch(e) {}
+    openAdminPanel();
+  } else { alert('Wrong password.'); }
+}
+function openAdminPanel() {
+  var ov = document.getElementById('adminOverlay');
+  if (!ov) return;
+  ov.classList.add('show');
+  var dl = document.getElementById('adminDeviceLabel');
+  if (dl) dl.textContent = 'DEV: ' + getDeviceId();
+  var mu = document.getElementById('adminMoneyUser');
+  if (mu && loggedInUser) mu.value = loggedInUser;
+  syncBlockedFromServer();
+  renderBlockedList();
+  renderErrorLog();
+}
+function closeAdminPanel() {
+  var ov = document.getElementById('adminOverlay');
+  if (ov) ov.classList.remove('show');
+}
+
+function getDeviceId() {
+  try {
+    var id = localStorage.getItem('rp_device_id');
+    if (!id) { id = 'dev-' + Math.random().toString(36).slice(2, 10) + '-' + Date.now().toString(36); localStorage.setItem('rp_device_id', id); }
+    return id;
+  } catch(e) { return 'dev-unknown'; }
+}
+function getBlockedDevices() {
+  try { var raw = localStorage.getItem('rp_blocked_devices'); return raw ? JSON.parse(raw) : []; } catch(e) { return []; }
+}
+function saveBlockedDevices(list) {
+  try { localStorage.setItem('rp_blocked_devices', JSON.stringify(list)); } catch(e) {}
+}
+function isDeviceBlocked(devId) {
+  return getBlockedDevices().some(function(b) { return b.id === devId; });
+}
+async function syncBlockedFromServer() {
+  initSupabase();
+  if (!supabaseClient) return;
+  try {
+    var { data, error } = await supabaseClient.from('admin_blocks').select('device_id, reason, created_at');
+    if (error) return;
+    var local = getBlockedDevices();
+    for (var i = 0; i < (data || []).length; i++) {
+      var id = data[i].device_id;
+      if (!local.some(function(b) { return b.id === id; })) {
+        local.push({ id: id, reason: data[i].reason || '', date: data[i].created_at || '' });
+      }
+    }
+    saveBlockedDevices(local);
+  } catch(e) {}
+}
+function checkDeviceBlocked() {
+  var dev = getDeviceId();
+  if (!isDeviceBlocked(dev)) return false;
+  gameActive = false;
+  var overlay = document.getElementById('gameOverlay');
+  var title = document.getElementById('resultTitle');
+  var msg = document.getElementById('resultMsg');
+  var rounds = document.getElementById('resultRounds');
+  if (title) { title.textContent = '\u26D4 DEVICE BLOCKED'; title.className = 'lose'; }
+  if (msg) msg.textContent = 'This device has been blocked from RobotPlanet.';
+  if (rounds) rounds.textContent = dev ? '(' + dev + ')' : '';
+  if (overlay) overlay.classList.add('show');
+  return true;
+}
+async function adminBlockDevice() {
+  var id = document.getElementById('blockDeviceId').value.trim();
+  var reason = document.getElementById('blockReason').value.trim();
+  if (!id) { alert('Enter a device id'); return; }
+  if (id === getDeviceId() && !confirm('This blocks YOUR current device. Continue?')) return;
+  var list = getBlockedDevices();
+  if (!list.some(function(b) { return b.id === id; })) {
+    list.push({ id: id, reason: reason, date: new Date().toISOString() });
+    saveBlockedDevices(list);
+  }
+  initSupabase();
+  if (supabaseClient) {
+    try {
+      var { error } = await supabaseClient.from('admin_blocks').upsert({ device_id: id, reason: reason }, { onConflict: 'device_id' });
+      if (error && (error.code === '42P01' || /does not exist/i.test(error.message || ''))) {
+        alert('Missing table. Run in Supabase SQL Editor:\nCREATE TABLE admin_blocks (device_id TEXT PRIMARY KEY, reason TEXT, created_at TIMESTAMP DEFAULT NOW());');
+      }
+    } catch(e) {}
+  }
+  renderBlockedList();
+}
+async function adminUnblockDevice(id) {
+  var list = getBlockedDevices().filter(function(b) { return b.id !== id; });
+  saveBlockedDevices(list);
+  initSupabase();
+  if (supabaseClient) {
+    try { await supabaseClient.from('admin_blocks').delete().eq('device_id', id); } catch(e) {}
+  }
+  renderBlockedList();
+}
+function adminBlockThisDevice() {
+  var el = document.getElementById('blockDeviceId');
+  if (el) el.value = getDeviceId();
+}
+function adminCopyDeviceId() {
+  var id = getDeviceId();
+  try { navigator.clipboard.writeText(id); } catch(e) {}
+  prompt('Device id:', id);
+}
+function renderBlockedList() {
+  var el = document.getElementById('blockedList');
+  if (!el) return;
+  var list = getBlockedDevices();
+  if (!list.length) { el.innerHTML = 'No blocked devices.'; return; }
+  var html = '';
+  for (var i = 0; i < list.length; i++) {
+    html += '<div style="display:flex;align-items:center;gap:6px;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.06);padding:3px 0">'
+      + '<span style="color:#ff8888;word-break:break-all">' + escapeHtml(list[i].id) + '</span>'
+      + '<span style="color:#888;flex-shrink:0">' + (list[i].reason ? '— ' + escapeHtml(list[i].reason) : '') + '</span>'
+      + '<button class="acc-btn" style="font-size:9px;padding:1px 6px;flex-shrink:0" onclick="adminUnblockDevice(\'' + list[i].id + '\')">Unblock</button></div>';
+  }
+  el.innerHTML = html;
+}
+async function adminResetAccount() {
+  var user = document.getElementById('adminResetUser').value.trim();
+  if (!user) { alert('Enter a username'); return; }
+  if (!confirm('Reset account "' + user + '"? Deletes the profile. Cannot be undone.')) return;
+  initSupabase();
+  if (!supabaseClient) { alert('Supabase not loaded.'); return; }
+  try {
+    var { error } = await supabaseClient.from('profiles').delete().eq('username', user);
+    if (error) { alert('Error: ' + error.message); return; }
+  } catch(e) { alert('Error: ' + e.message); return; }
+  try { localStorage.removeItem('rp_shop_' + user); } catch(e) {}
+  if (loggedInUser === user) {
+    loggedInUser = null; profileId = null;
+    try { localStorage.removeItem('rp_remember'); } catch(e) {}
+    var ai = document.getElementById('accountInfo');
+    var ab = document.getElementById('accountBtns');
+    if (ai) ai.style.display = 'none';
+    if (ab) ab.style.display = 'flex';
+  }
+  alert('Account "' + user + '" reset.');
+}
+async function adminGiveMoney(addMode) {
+  var user = document.getElementById('adminMoneyUser').value.trim() || (loggedInUser || '');
+  document.getElementById('adminMoneyUser').value = user;
+  var amt = parseInt(document.getElementById('adminMoneyAmount').value, 10);
+  if (!user) { alert('Enter a username'); return; }
+  if (isNaN(amt) || amt === 0) { alert('Enter an amount'); return; }
+  initSupabase();
+  if (!supabaseClient) { alert('Supabase not loaded.'); return; }
+  try {
+    var newMoney = amt;
+    if (addMode) {
+      var { data, error } = await supabaseClient.from('profiles').select('money').eq('username', user).single();
+      if (error || !data) { alert('Account "' + user + '" not found.'); return; }
+      newMoney = (data.money || 0) + amt;
+    }
+    await supabaseClient.from('profiles').update({ money: newMoney }).eq('username', user);
+    if (loggedInUser === user) {
+      money = newMoney;
+      var lm = document.getElementById('lobbyMoneySmall');
+      var mel = document.getElementById('moneyDisplay');
+      var sm = document.getElementById('shopMoney');
+      if (lm) lm.textContent = '$' + money;
+      if (mel) mel.textContent = '$' + money;
+      if (sm) sm.textContent = '$' + money + '  |  Lv.' + getLevel(xp) + ' (' + xp + 'XP)';
+      saveMoney();
+      saveShopData();
+    }
+    alert('Account "' + user + '" now has $' + newMoney + '.');
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+// ---- ERROR LOG ----
+var errorLog = [];
+(function() {
+  try { var raw = localStorage.getItem('rp_error_log'); if (raw) errorLog = JSON.parse(raw); } catch(e) {}
+  window.onerror = function(msg, src, line, col, err) {
+    pushError(msg, (err && err.stack) ? err.stack : (src + ':' + line + ':' + col));
+    return false;
+  };
+  window.addEventListener('unhandledrejection', function(ev) {
+    var m = 'Unhandled promise rejection';
+    if (ev && ev.reason) m = (typeof ev.reason.message === 'string') ? ev.reason.message : String(ev.reason);
+    pushError(m, (ev && ev.reason && ev.reason.stack) ? ev.reason.stack : '');
+  });
+})();
+function pushError(msg, stack) {
+  errorLog.push({ time: new Date().toISOString(), msg: String(msg || '').substring(0, 500), stack: String(stack || '').substring(0, 500) });
+  if (errorLog.length > 200) errorLog = errorLog.slice(-200);
+  try { localStorage.setItem('rp_error_log', JSON.stringify(errorLog)); } catch(e) {}
+  var el = document.getElementById('errorLogList');
+  var cnt = document.getElementById('errCount');
+  if (cnt) cnt.textContent = '(' + errorLog.length + ')';
+  if (el && adminAuthed()) renderErrorLog();
+}
+function renderErrorLog() {
+  var el = document.getElementById('errorLogList');
+  if (!el) return;
+  var cnt = document.getElementById('errCount');
+  if (cnt) cnt.textContent = '(' + errorLog.length + ')';
+  if (!errorLog.length) { el.innerHTML = 'No errors logged.'; return; }
+  var html = '';
+  for (var i = errorLog.length - 1; i >= 0; i--) {
+    var e = errorLog[i];
+    html += '<div style="margin-bottom:6px"><span style="color:#888">' + new Date(e.time).toLocaleTimeString() + '</span> '
+      + '<b style="color:#ff7777">' + escapeHtml(e.msg) + '</b>'
+      + (e.stack ? '<div style="color:#cc8866;word-break:break-all">' + escapeHtml(e.stack) + '</div>' : '') + '</div>';
+  }
+  el.innerHTML = html;
+}
+function adminResetErrorLog() {
+  errorLog = [];
+  try { localStorage.setItem('rp_error_log', '[]'); } catch(e) {}
+  renderErrorLog();
+}
+function adminExportErrors() {
+  var lines = errorLog.map(function(e) { return '[' + e.time + '] ' + e.msg + (e.stack ? ' | ' + e.stack : ''); });
+  var blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'robotplanet_errors.txt';
+  a.click();
+}
+function escapeHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
 function rememberDevice(user, hash) {
   try { localStorage.setItem('rp_remember', JSON.stringify({user:user, hash:hash})); } catch(e) {}
