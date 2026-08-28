@@ -822,8 +822,10 @@ function setControlMode(mode) {
   controlMode = mode;
   var btns = document.querySelectorAll('#singleOptions .mode-btn');
   for (var i = 0; i < btns.length; i++) {
+    if (!btns[i] || !btns[i].onclick) continue;
     btns[i].className = 'mode-btn' + (btns[i].getAttribute('onclick').indexOf("'" + mode + "'") !== -1 ? ' active' : '');
   }
+  saveSettings();
 }
 
 function setLocal2pControls(mode) {
@@ -835,6 +837,7 @@ function setLocal2pControls(mode) {
   } else {
     document.getElementById('controlsHint').innerHTML = '<kbd style="color:#44aaff">W A S D</kbd> P1 move | <kbd style="color:#44aaff">I J K L</kbd> P1 aim | <kbd style="color:#44aaff">Space</kbd> P1 fire | <kbd style="color:#ff8844">\u2190\u2191\u2192\u2193</kbd> P2 move | <kbd style="color:#ff8844">Mouse</kbd> P2 aim | <kbd style="color:#ff8844">Click</kbd> P2 fire';
   }
+  saveSettings();
 }
 
 function setLocal2pMode(mode) {
@@ -847,6 +850,7 @@ function setLocal2pMode(mode) {
     opponents[i].style.opacity = local2pPvP ? '0.4' : '1';
     opponents[i].style.pointerEvents = local2pPvP ? 'none' : 'auto';
   }
+  saveSettings();
 }
 
 function setOnline2p(on) {
@@ -863,6 +867,7 @@ function setOnline2p(on) {
   var wrap = document.getElementById('online2pCtrlWrap');
   if (wrap) wrap.style.display = on ? 'flex' : 'none';
   if (!on && playerId2) playerId2 = null;
+  saveSettings();
 }
 
 function setOnline2pControls(mode) {
@@ -876,6 +881,7 @@ function setOnline2pControls(mode) {
   var lt = document.getElementById('local2pTouchBtn');
   if (lk) lk.className = 'mode-btn' + (mode === 'kbm' ? ' active' : '');
   if (lt) lt.className = 'mode-btn' + (mode === 'touch' ? ' active' : '');
+  saveSettings();
 }
 
 // Touch handling
@@ -1085,6 +1091,7 @@ function setEnemyCount(n) {
   for (var i = 0; i < btns.length; i++) {
     btns[i].className = 'enemy-btn' + (parseInt(btns[i].textContent) === n ? ' active' : '');
   }
+  saveSettings();
 }
 
 function setDifficulty(n) {
@@ -1094,11 +1101,40 @@ function setDifficulty(n) {
   for (var i = 0; i < btns.length; i++) {
     btns[i].className = 'diff-btn' + (i === n ? ' active' : '');
   }
+  saveSettings();
 }
 
 var gameMode = 'single';
 var mpDisconnectTimer = 0;
 var difficulty = 0;
+
+function saveSettings() {
+  try {
+    localStorage.setItem('rp_settings', JSON.stringify({
+      gameMode: gameMode,
+      enemyCount: enemyCount,
+      difficulty: difficulty,
+      controlMode: controlMode,
+      local2pControls: local2pTouchMode ? 'touch' : 'kbm',
+      local2pMode: local2pPvP ? 'pvp' : 'coop',
+      online2p: local2pOnline
+    }));
+  } catch(e) {}
+}
+function applySavedSettings() {
+  try {
+    var raw = localStorage.getItem('rp_settings');
+    if (!raw) return;
+    var s = JSON.parse(raw);
+    if (s.gameMode === 'single' || s.gameMode === 'campaign' || s.gameMode === 'local2p' || s.gameMode === 'multi') setGameMode(s.gameMode);
+    if (typeof s.enemyCount === 'number' && s.enemyCount >= 1 && s.enemyCount <= 3) setEnemyCount(s.enemyCount);
+    if (typeof s.difficulty === 'number' && s.difficulty >= 0 && s.difficulty <= 2) setDifficulty(s.difficulty);
+    if (s.controlMode === 'kbm' || s.controlMode === 'touch') setControlMode(s.controlMode);
+    if (s.local2pControls === 'kbm' || s.local2pControls === 'touch') setLocal2pControls(s.local2pControls);
+    if (s.local2pMode === 'coop' || s.local2pMode === 'pvp') setLocal2pMode(s.local2pMode);
+    if (s.online2p !== undefined) setOnline2p(!!s.online2p);
+  } catch(e) {}
+}
 var mpChannel, supabaseClient, roomCode, playerId, isHost, mpStateSendCounter = 0;
 var maxPlayers = 100;
 var gameModeType = 'ffa'; // 'ffa', 'teams', 'koth'
@@ -1186,6 +1222,7 @@ function setGameMode(mode) {
   document.getElementById('startBtn').style.display = (mode === 'single' || mode === 'campaign' || mode === 'local2p') ? '' : 'none';
   document.getElementById('startBtn').textContent = mode === 'local2p' ? '\u2694 START 2P' : mode === 'campaign' ? '\u2694 START CAMPAIGN (20 levels)' : '\u2694 FIGHT';
   updateColorPickers();
+  saveSettings();
 }
 
 function initSupabase() {
@@ -4522,7 +4559,7 @@ function getTankStats() {
   }
   return { hp: hp, speed: speed, shield: shield, dmg: dmg, color: t.color };
 }
-setTimeout(function(){ if (typeof tryAutoLogin === 'function') tryAutoLogin(); }, 500);
+setTimeout(function(){ if (typeof applySavedSettings === 'function') applySavedSettings(); if (typeof tryAutoLogin === 'function') tryAutoLogin(); }, 500);
 setTimeout(function(){ if (typeof updateColorPickers === 'function') updateColorPickers(); }, 800);
 </script>
 </body>
