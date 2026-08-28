@@ -1603,6 +1603,7 @@ class RobotArena {
       actual -= blocked;
       if (blocked > 0) for (var i = 0; i < 12; i++) sparks.push(createSpark(this.x, this.y, "#66ccff"));
     }
+    if (this.bunkerWeapon) actual = Math.min(actual, Math.max(1, Math.ceil(this.maxHp / 5)));
     this.hp = Math.max(0, this.hp - actual);
     this.shakeTimer = 12;
     this.hitFlash = 8;
@@ -3038,7 +3039,8 @@ function updateProjectiles() {
         if (p.x > wl.x - wl.w/2 && p.x < wl.x + wl.w/2 && p.y > wl.y - wl.h/2 && p.y < wl.y + wl.h/2) { wallHit = wl; break; }
       }
       if (wallHit) {
-        var wdmg = Math.max(5, Math.round((p.damage || 0) * (player.diffDmgMult || 1)));
+        var wcap = Math.max(1, Math.ceil(wallHit.maxHp / 5));
+        var wdmg = Math.min(Math.max(1, Math.round((p.damage || 0) * (player.diffDmgMult || 1))), wcap);
         wallHit.hp -= wdmg;
         createExplosion(p.x, p.y, "#bbbbbb", 10, false);
         addHitText(wallHit.x, wallHit.y - wallHit.h/2 - 6, '-' + wdmg, "#cccccc");
