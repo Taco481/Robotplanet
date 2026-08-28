@@ -248,6 +248,21 @@
     z-index: 15; overflow-y: auto; padding: 10px; box-sizing: border-box;
   }
   .shop-overlay.show { opacity: 1; pointer-events: all; }
+  .admin-overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    display: flex; flex-direction: column; align-items: center;
+    background: rgba(5,5,20,0.97); border-radius: 12px;
+    opacity: 0; pointer-events: none; transition: opacity 0.3s;
+    z-index: 20; overflow-y: auto; padding: 10px; box-sizing: border-box;
+  }
+  .admin-overlay.show { opacity: 1; pointer-events: all; }
+  .admin-panel { width: min(680px, 96vw); max-width: 680px; }
+  .admin-input {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px; color: #fff; padding: 5px 8px; font-size: 11px; font-family: monospace; outline: none;
+  }
+  .admin-input:focus { border-color: #4a4aff; }
+  .admin-sec { margin: 10px 0 0 0; border-top: 1px solid rgba(74,74,255,0.15); padding-top: 10px; text-align: left; }
   .shop-overlay h2 { color: #ffdd44; font-size: 22px; margin: 4px 0; }
   .shop-overlay .shop-money { color: #ffdd44; font-size: 14px; margin-bottom: 6px; }
   .shop-overlay .shop-tabs { display: flex; gap: 4px; margin-bottom: 8px; }
@@ -478,6 +493,7 @@
 
         <div id="modeToggle" class="mode-toggle">
           <button class="mode-main-btn active" onclick="setGameMode('single')">Singleplayer</button>
+          <button class="mode-main-btn" onclick="setGameMode('campaign')">Campaign</button>
           <button class="mode-main-btn" onclick="setGameMode('multi')">Multiplayer</button>
         </div>
 
@@ -507,6 +523,25 @@
               <button class="diff-btn active" onclick="setDifficulty(0)">Easy</button>
               <button class="diff-btn" onclick="setDifficulty(1)">Normal</button>
               <button class="diff-btn" onclick="setDifficulty(2)">Hard</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="campaignOptions" style="display:none;width:100%;flex-direction:column;align-items:center;gap:8px">
+          <div style="color:#ffcc44;font-size:12px;font-weight:bold">⚔ PATH CAMPAIGN</div>
+          <div style="font-size:10px;color:#888;text-align:center;line-height:1.7">
+            Ride the path and destroy the <b style="color:#ff6666">ENEMY BASE</b> at the end of 20 levels.<br>
+            Level 1 = a single small tank &bull; every level gets harder.<br>
+            <b style="color:#ffcc44">Level 5+:</b> turret walls you must tear down to pass<br>
+            <b style="color:#cc88ff">Level 10+:</b> bunkers<br>
+            <b style="color:#ff6666">Level 15+:</b> near-impossible, even with the best tank, weapon and upgrades<br><br>
+            <kbd>W A S D</kbd> move &nbsp;|&nbsp; <kbd>Mouse</kbd> aim &nbsp;|&nbsp; <kbd>Click</kbd> / <kbd>Space</kbd> fire | <kbd>1-5</kbd> weapon
+          </div>
+          <div class="lobby-row">
+            <span class="label">Controls</span>
+            <div class="btn-group">
+              <button class="mode-btn active" onclick="setControlMode('kbm')">K&amp;M</button>
+              <button class="mode-btn" onclick="setControlMode('touch')">Touch</button>
             </div>
           </div>
         </div>
@@ -624,12 +659,70 @@
             <span id="lobbyMoneySmall" style="color:#ffdd44;font-weight:bold">$0</span>
             <button class="acc-btn" onclick="showShop()" style="font-size:9px;padding:2px 6px;background:rgba(255,221,68,0.2)">SHOP</button>
             <button class="acc-btn" onclick="logoutAccount()" style="font-size:9px;padding:2px 6px">✕</button>
+            <button class="acc-btn" onclick="resetAccount()" style="font-size:9px;padding:2px 6px;background:rgba(255,80,80,0.25)">RESET</button>
           </div>
+          <button class="acc-btn" onclick="showAdminLogin()" style="font-size:9px;padding:2px 6px">⚙ DEV</button>
         </div>
       </div>
 
       <div class="lobby-footer">ROBOTPLANET v1.0</div>
     </div>
+    <div class="admin-overlay" id="adminOverlay">
+      <div class="admin-panel">
+        <div class="mp-actions" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+          <span style="color:#ff8855;font-weight:bold;font-size:15px">⚙ DEV ADMIN PANEL</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span id="adminDeviceLabel" style="color:#888;font-size:10px"></span>
+            <button class="acc-btn" onclick="closeAdminPanel()" style="font-size:10px;padding:2px 8px">✕</button>
+          </div>
+        </div>
+
+        <div class="admin-sec">
+          <span class="label" style="color:#ff8888">⛔ BLOCK DEVICES</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+            <input id="blockDeviceId" class="admin-input" placeholder="device id" style="flex:1;min-width:140px">
+            <input id="blockReason" class="admin-input" placeholder="reason" style="flex:1;min-width:100px">
+            <button class="mp-btn" onclick="adminBlockDevice()" style="font-size:11px;padding:5px 12px">⛔ Block</button>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+            <button class="mp-btn secondary" style="font-size:10px;padding:3px 10px" onclick="adminBlockThisDevice()">Block THIS device</button>
+            <button class="mp-btn secondary" style="font-size:10px;padding:3px 10px" onclick="adminCopyDeviceId()">Copy device id</button>
+          </div>
+          <div id="blockedList" style="font-size:10px;color:#aaa;margin-top:6px;max-height:140px;overflow-y:auto"></div>
+        </div>
+
+        <div class="admin-sec">
+          <span class="label" style="color:#ff8888">🗑 RESET ACCOUNT</span>
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <input id="adminResetUser" class="admin-input" placeholder="username" style="flex:1">
+            <button class="mp-btn" onclick="adminResetAccount()" style="font-size:11px;padding:5px 12px;background:rgba(255,80,80,0.3);box-shadow:none">Reset</button>
+          </div>
+        </div>
+
+        <div class="admin-sec">
+          <span class="label" style="color:#88ff88">💵 GIVE / SET MONEY</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+            <input id="adminMoneyUser" class="admin-input" placeholder="username" style="flex:1;min-width:110px">
+            <input id="adminMoneyAmount" class="admin-input" type="number" placeholder="amount" style="width:100px">
+            <button class="mp-btn" onclick="adminMoney(1)" style="font-size:11px;padding:5px 12px">+ Give</button>
+            <button class="mp-btn secondary" onclick="adminMoney(-1)" style="font-size:11px;padding:5px 12px">− Take</button>
+            <button class="mp-btn secondary" onclick="adminMoney(0)" style="font-size:11px;padding:5px 12px">= Set</button>
+          </div>
+        </div>
+
+        <div class="admin-sec">
+          <span class="label" style="color:#ffaa44">⚠ ERROR LOG <span id="errCount" style="color:#ff8844"></span></span>
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <button class="mp-btn secondary" style="font-size:10px;padding:3px 10px" onclick="adminResetErrorLog()">Clear log</button>
+            <button class="mp-btn secondary" style="font-size:10px;padding:3px 10px" onclick="adminExportErrors()">Export .txt</button>
+          </div>
+          <div id="errorLogList" style="font-size:9px;font-family:monospace;color:#ffaa88;max-height:220px;overflow-y:auto;background:rgba(255,0,0,0.06);border:1px solid rgba(255,80,80,0.2);border-radius:6px;padding:6px;margin-top:6px;text-align:left"></div>
+        </div>
+
+        <div style="margin-top:14px;font-size:9px;color:#666">Apparaten krijgen een lokaal gegenereerde ID (per browser). Blokkades gelden op deze browser en in de admin_blocks-tabel.</div>
+      </div>
+    </div>
+
     <div class="overlay" id="gameOverlay">
       <h1 id="resultTitle">VICTORY</h1>
       <p id="resultMsg"></p>
@@ -701,6 +794,12 @@ var local2pTouchMode = false;
 var local2pPvP = false;
 var local2pOnline = false;
 var playerId2 = null;
+var camX = 0;
+var campaignLevel = 1;
+var campaignWorldW = 16000;
+var campaignWalls = [];
+var campaignBase = null;
+var campaignBanner = 0;
 var p2Joystick = { active: false, centerX: 0, centerY: 0, dx: 0, dy: 0, dist: 0, touchId: -1 };
 var enemyCount = 1, money = 0;
 function loadMoney() { try { var m = localStorage.getItem('rp_money'); if (m !== null) money = parseInt(m) || 0; } catch(e) {} }
@@ -711,6 +810,7 @@ var controlMode = 'kbm';
 var joystick = { active: false, centerX: 0, centerY: 0, dx: 0, dy: 0, dist: 0, touchId: -1 };
 var aimActive = false, aimDragged = false, aimX = 0, aimY = 0, aimTouchId = -1;
 var mouseX = 0, mouseY = 0, fireBtnHeld = false, fireBtn2Held = false;
+function worldX(sx) { return (gameMode === 'campaign') ? (sx + camX) : sx; }
 
 document.addEventListener('mousemove', function(e) {
   var rect = canvas.getBoundingClientRect();
@@ -722,8 +822,10 @@ function setControlMode(mode) {
   controlMode = mode;
   var btns = document.querySelectorAll('#singleOptions .mode-btn');
   for (var i = 0; i < btns.length; i++) {
+    if (!btns[i] || !btns[i].onclick) continue;
     btns[i].className = 'mode-btn' + (btns[i].getAttribute('onclick').indexOf("'" + mode + "'") !== -1 ? ' active' : '');
   }
+  saveSettings();
 }
 
 function setLocal2pControls(mode) {
@@ -735,6 +837,7 @@ function setLocal2pControls(mode) {
   } else {
     document.getElementById('controlsHint').innerHTML = '<kbd style="color:#44aaff">W A S D</kbd> P1 move | <kbd style="color:#44aaff">I J K L</kbd> P1 aim | <kbd style="color:#44aaff">Space</kbd> P1 fire | <kbd style="color:#ff8844">\u2190\u2191\u2192\u2193</kbd> P2 move | <kbd style="color:#ff8844">Mouse</kbd> P2 aim | <kbd style="color:#ff8844">Click</kbd> P2 fire';
   }
+  saveSettings();
 }
 
 function setLocal2pMode(mode) {
@@ -747,6 +850,7 @@ function setLocal2pMode(mode) {
     opponents[i].style.opacity = local2pPvP ? '0.4' : '1';
     opponents[i].style.pointerEvents = local2pPvP ? 'none' : 'auto';
   }
+  saveSettings();
 }
 
 function setOnline2p(on) {
@@ -763,6 +867,7 @@ function setOnline2p(on) {
   var wrap = document.getElementById('online2pCtrlWrap');
   if (wrap) wrap.style.display = on ? 'flex' : 'none';
   if (!on && playerId2) playerId2 = null;
+  saveSettings();
 }
 
 function setOnline2pControls(mode) {
@@ -776,6 +881,7 @@ function setOnline2pControls(mode) {
   var lt = document.getElementById('local2pTouchBtn');
   if (lk) lk.className = 'mode-btn' + (mode === 'kbm' ? ' active' : '');
   if (lt) lt.className = 'mode-btn' + (mode === 'touch' ? ' active' : '');
+  saveSettings();
 }
 
 // Touch handling
@@ -985,6 +1091,7 @@ function setEnemyCount(n) {
   for (var i = 0; i < btns.length; i++) {
     btns[i].className = 'enemy-btn' + (parseInt(btns[i].textContent) === n ? ' active' : '');
   }
+  saveSettings();
 }
 
 function setDifficulty(n) {
@@ -994,11 +1101,40 @@ function setDifficulty(n) {
   for (var i = 0; i < btns.length; i++) {
     btns[i].className = 'diff-btn' + (i === n ? ' active' : '');
   }
+  saveSettings();
 }
 
 var gameMode = 'single';
 var mpDisconnectTimer = 0;
 var difficulty = 0;
+
+function saveSettings() {
+  try {
+    localStorage.setItem('rp_settings', JSON.stringify({
+      gameMode: gameMode,
+      enemyCount: enemyCount,
+      difficulty: difficulty,
+      controlMode: controlMode,
+      local2pControls: local2pTouchMode ? 'touch' : 'kbm',
+      local2pMode: local2pPvP ? 'pvp' : 'coop',
+      online2p: local2pOnline
+    }));
+  } catch(e) {}
+}
+function applySavedSettings() {
+  try {
+    var raw = localStorage.getItem('rp_settings');
+    if (!raw) return;
+    var s = JSON.parse(raw);
+    if (s.gameMode === 'single' || s.gameMode === 'campaign' || s.gameMode === 'local2p' || s.gameMode === 'multi') setGameMode(s.gameMode);
+    if (typeof s.enemyCount === 'number' && s.enemyCount >= 1 && s.enemyCount <= 3) setEnemyCount(s.enemyCount);
+    if (typeof s.difficulty === 'number' && s.difficulty >= 0 && s.difficulty <= 2) setDifficulty(s.difficulty);
+    if (s.controlMode === 'kbm' || s.controlMode === 'touch') setControlMode(s.controlMode);
+    if (s.local2pControls === 'kbm' || s.local2pControls === 'touch') setLocal2pControls(s.local2pControls);
+    if (s.local2pMode === 'coop' || s.local2pMode === 'pvp') setLocal2pMode(s.local2pMode);
+    if (s.online2p !== undefined) setOnline2p(!!s.online2p);
+  } catch(e) {}
+}
 var mpChannel, supabaseClient, roomCode, playerId, isHost, mpStateSendCounter = 0;
 var maxPlayers = 100;
 var gameModeType = 'ffa'; // 'ffa', 'teams', 'koth'
@@ -1071,17 +1207,22 @@ function setGameMode(mode) {
   for (var i = 0; i < btns.length; i++) {
     if (!btns[i] || !btns[i].onclick) continue;
     var oc = btns[i].getAttribute('onclick') || '';
-    var isActive = oc.indexOf("'single'") !== -1 ? mode === 'single' : (oc.indexOf("'multi'") !== -1 ? (mode === 'multi' || mode === 'local2p') : false);
-    btns[i].className = 'mode-main-btn' + (isActive ? ' active' : '');
+    var isAct;
+    if (oc.indexOf("'single'") !== -1) isAct = (mode === 'single');
+    else if (oc.indexOf("'campaign'") !== -1) isAct = (mode === 'campaign');
+    else isAct = (mode === 'multi' || mode === 'local2p');
+    btns[i].className = 'mode-main-btn' + (isAct ? ' active' : '');
   }
   document.getElementById('singleOptions').style.display = mode === 'single' ? 'flex' : 'none';
+  document.getElementById('campaignOptions').style.display = mode === 'campaign' ? 'flex' : 'none';
   document.getElementById('local2pOptions').style.display = mode === 'local2p' ? 'flex' : 'none';
   document.getElementById('multiOptions').style.display = (mode === 'multi' || mode === 'local2p') ? 'flex' : 'none';
   document.getElementById('quickMatchBtn').style.display = mode === 'multi' ? 'inline-block' : 'none';
   document.getElementById('cancelQueueBtn').style.display = 'none';
-  document.getElementById('startBtn').style.display = (mode === 'single' || mode === 'local2p') ? '' : 'none';
-  document.getElementById('startBtn').textContent = mode === 'local2p' ? '\u2694 START 2P' : '\u2694 FIGHT';
+  document.getElementById('startBtn').style.display = (mode === 'single' || mode === 'campaign' || mode === 'local2p') ? '' : 'none';
+  document.getElementById('startBtn').textContent = mode === 'local2p' ? '\u2694 START 2P' : mode === 'campaign' ? '\u2694 START CAMPAIGN (20 levels)' : '\u2694 FIGHT';
   updateColorPickers();
+  saveSettings();
 }
 
 function initSupabase() {
@@ -1571,6 +1712,7 @@ class RobotArena {
       actual -= blocked;
       if (blocked > 0) for (var i = 0; i < 12; i++) sparks.push(createSpark(this.x, this.y, "#66ccff"));
     }
+    if (this.bunkerWeapon) actual = Math.min(actual, Math.max(1, Math.ceil(this.maxHp / 5)));
     this.hp = Math.max(0, this.hp - actual);
     this.shakeTimer = 12;
     this.hitFlash = 8;
@@ -1649,7 +1791,7 @@ class RobotArena {
           my = joystick.dy * joystick.dist;
         }
         if (aimActive && aimDragged) {
-          var adx = aimX - this.x;
+          var adx = worldX(aimX) - this.x;
           var ady = aimY - this.y;
           if (Math.sqrt(adx*adx + ady*ady) > 5) this.turretAngle = Math.atan2(ady, adx);
         } else {
@@ -1691,7 +1833,7 @@ class RobotArena {
           if (keys['l']) aimDx1 = 1;
           if (aimDx1 !== 0 || aimDy1 !== 0) this.turretAngle = Math.atan2(aimDy1, aimDx1);
         } else {
-          var tdx = mouseX - this.x;
+          var tdx = worldX(mouseX) - this.x;
           var tdy = mouseY - this.y;
           if (Math.sqrt(tdx*tdx + tdy*tdy) > 5) this.turretAngle = Math.atan2(tdy, tdx);
         }
@@ -1702,11 +1844,33 @@ class RobotArena {
       this.lastMx = mx;
       this.lastMy = my;
     }
-    this.x = Math.max(35, Math.min(W - 35, this.x));
-    this.y = Math.max(55, Math.min(H - 35, this.y));
+    if (gameMode === 'campaign') {
+      var civ = this.w * 0.5;
+      for (var wi = 0; wi < campaignWalls.length; wi++) {
+        var wl = campaignWalls[wi];
+        if (wl.hp <= 0) continue;
+        if (this.x + civ > wl.x - wl.w/2 && this.x - civ < wl.x + wl.w/2 && this.y + civ > wl.y - wl.h/2 && this.y - civ < wl.y + wl.h/2) {
+          var dxL = this.x - (wl.x - wl.w/2 - civ);
+          var dxR = (wl.x + wl.w/2 + civ) - this.x;
+          var dyT = this.y - (wl.y - wl.h/2 - civ);
+          var dyB = (wl.y + wl.h/2 + civ) - this.y;
+          var m = Math.min(dxL, dxR, dyT, dyB);
+          if (m === dxL) this.x = wl.x - wl.w/2 - civ;
+          else if (m === dxR) this.x = wl.x + wl.w/2 + civ;
+          else if (m === dyT) this.y = wl.y - wl.h/2 - civ;
+          else this.y = wl.y + wl.h/2 + civ;
+        }
+      }
+      this.x = Math.max(35, Math.min(campaignWorldW - 35, this.x));
+      this.y = Math.max(55, Math.min(H - 35, this.y));
+    } else {
+      this.x = Math.max(35, Math.min(W - 35, this.x));
+      this.y = Math.max(55, Math.min(H - 35, this.y));
+    }
   }
 
   draw() {
+    if (this.bunkerWeapon && !this.isPlayer && gameMode === 'campaign') { this.drawBunkerVisual(); return; }
     ctx.save();
     var ox = 0, oy = 0;
     if (this.shakeTimer > 0) {
@@ -1755,8 +1919,10 @@ class RobotArena {
     }
     var bodyGrad = ctx.createLinearGradient(-s/2, 0, s/2, 0);
     if (this.isPlayer) {
-      bodyGrad.addColorStop(0, "#1a66aa"); bodyGrad.addColorStop(0.3, "#3388dd");
-      bodyGrad.addColorStop(0.7, "#3388dd"); bodyGrad.addColorStop(1, "#1a66aa");
+      var cDark = shadeColor(this.color, -0.35);
+      var cMid = shadeColor(this.color, 0.05);
+      bodyGrad.addColorStop(0, cDark); bodyGrad.addColorStop(0.3, cMid);
+      bodyGrad.addColorStop(0.7, cMid); bodyGrad.addColorStop(1, cDark);
     } else {
       bodyGrad.addColorStop(0, "#aa2222"); bodyGrad.addColorStop(0.3, "#dd4444");
       bodyGrad.addColorStop(0.7, "#dd4444"); bodyGrad.addColorStop(1, "#aa2222");
@@ -1791,7 +1957,7 @@ class RobotArena {
     ctx.save();
     ctx.rotate(this.turretAngle);
     var turretR = s/4.2;
-    ctx.fillStyle = this.isPlayer ? "#2277cc" : "#cc3333";
+    ctx.fillStyle = this.isPlayer ? shadeColor(this.color, 0.1) : "#cc3333";
     ctx.beginPath(); ctx.arc(0, 0, turretR, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(0, 0, turretR, 0, Math.PI * 2); ctx.stroke();
@@ -1799,7 +1965,7 @@ class RobotArena {
     ctx.beginPath(); ctx.arc(0, -2, turretR * 0.45, 0, Math.PI * 2); ctx.fill();
 
     var barrelLen = s/2 + 8;
-    ctx.strokeStyle = this.isPlayer ? "#1a5caa" : "#aa2828";
+    ctx.strokeStyle = this.isPlayer ? shadeColor(this.color, -0.25) : "#aa2828";
     ctx.lineWidth = 6; ctx.lineCap = "round";
     ctx.shadowColor = this.shootFlash > 0 ? "#ffdd44" : "transparent";
     ctx.shadowBlur = this.shootFlash > 0 ? 20 : 0;
@@ -1830,6 +1996,90 @@ class RobotArena {
     ctx.fillStyle = 'rgba(255,255,255,' + (this.hp > 0 ? 0.7 : 0.3) + ')';
     ctx.font = "bold 10px monospace"; ctx.textAlign = "center";
     ctx.fillText(this.name, 0, s/2 + 16);
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+
+  drawBunkerVisual() {
+    ctx.save();
+    var ox = 0, oy = 0;
+    if (this.shakeTimer > 0) {
+      ox = (Math.random() - 0.5) * this.shakeTimer * 1.8;
+      oy = (Math.random() - 0.5) * this.shakeTimer * 1.8;
+    }
+    ctx.translate(this.x + ox, this.y + oy);
+    var s = this.w;
+    if (this.hitFlash > 0) { ctx.shadowColor = "#ffffff"; ctx.shadowBlur = 40; }
+    if (this.shootFlash > 0) { ctx.shadowColor = "#888899"; ctx.shadowBlur = 25; }
+    var R = s * 0.74;
+
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.beginPath(); ctx.ellipse(0, R * 0.62, R * 0.95, R * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+
+    var g = ctx.createLinearGradient(0, -R, 0, R);
+    g.addColorStop(0, "#9a9aab");
+    g.addColorStop(0.5, "#777788");
+    g.addColorStop(1, "#555566");
+    ctx.fillStyle = g;
+    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (var i = 0; i < 6; i++) {
+      var a = i * Math.PI / 3;
+      var px = Math.cos(a) * R, py = Math.sin(a) * R;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+
+    ctx.strokeStyle = "rgba(0,0,0,0.18)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (var j = 0; j < 6; j++) {
+      var a2 = j * Math.PI / 3;
+      var px2 = Math.cos(a2) * R * 0.62, py2 = Math.sin(a2) * R * 0.62;
+      if (j === 0) ctx.moveTo(px2, py2); else ctx.lineTo(px2, py2);
+    }
+    ctx.closePath(); ctx.stroke();
+
+    var g2 = ctx.createLinearGradient(0, -R * 0.34, 0, R * 0.34);
+    g2.addColorStop(0, "#b8b8c8");
+    g2.addColorStop(1, "#888899");
+    ctx.fillStyle = g2;
+    ctx.beginPath();
+    for (var k = 0; k < 6; k++) {
+      var a3 = k * Math.PI / 3;
+      var px3 = Math.cos(a3) * R * 0.34, py3 = Math.sin(a3) * R * 0.34;
+      if (k === 0) ctx.moveTo(px3, py3); else ctx.lineTo(px3, py3);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.stroke();
+
+    ctx.save();
+    ctx.rotate(this.turretAngle);
+    var barrelLen = s * 0.72;
+    ctx.strokeStyle = "#555566"; ctx.lineWidth = 7; ctx.lineCap = "round";
+    ctx.shadowColor = "#ffdd44"; ctx.shadowBlur = this.shootFlash > 0 ? 20 : 0;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(barrelLen, 0); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.08)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(2, -2); ctx.lineTo(barrelLen - 2, -2); ctx.stroke();
+    var tg = ctx.createLinearGradient(0, -R * 0.28, 0, R * 0.28);
+    tg.addColorStop(0, "#a8a8b8");
+    tg.addColorStop(1, "#707081");
+    ctx.fillStyle = tg;
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.36, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.36, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.14)";
+    ctx.beginPath(); ctx.arc(0, -2, R * 0.15, 0, Math.PI * 2); ctx.fill();
+    if (this.shootFlash > 0) {
+      var intensity = this.shootFlash / 8;
+      ctx.shadowColor = "#ffdd44"; ctx.shadowBlur = 40;
+      ctx.fillStyle = 'rgba(255, 221, 68, ' + (intensity * 0.8) + ')';
+      ctx.beginPath(); ctx.arc(barrelLen + 3, 0, 9 * intensity, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255, 255, 255, ' + (intensity * 0.5) + ')';
+      ctx.beginPath(); ctx.arc(barrelLen + 3, 0, 4 * intensity, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
     ctx.shadowBlur = 0;
     ctx.restore();
   }
@@ -2006,11 +2256,138 @@ function startGameMP() {
   if (player2) upsertState2();
 }
 
+function campaignEnemyStats(L) {
+  var hp = 90 + L * 12;
+  var dmg = 0.55 + L * 0.045;
+  var cooldown = Math.max(10, 34 - L * 1.1);
+  var speed = Math.min(1.7, 0.75 + L * 0.045);
+  if (L >= 15) { hp = hp * 1.5; dmg = dmg * 1.3; speed = speed * 1.1; cooldown = cooldown * 0.8; }
+  return { hp: hp, dmg: dmg, cooldown: cooldown, speed: speed };
+}
+
+function startCampaign() {
+  loadMoney();
+  var input = document.getElementById('nameInput');
+  var pName = input ? input.value.trim() || "MechWarrior" : "MechWarrior";
+  var ts = loggedInUser ? getTankStats() : { hp: 200, speed: 1.0, shield: 0, dmg: 1.0, color: '#88ccff' };
+  gameModeType = 'ffa';
+  camX = 0;
+  campaignLevel = 1;
+  campaignBanner = 120;
+  campaignWalls = [];
+  campaignBase = null;
+  enemies = [];
+  player2 = null;
+
+  player = new RobotArena(pName, 110, 250, true);
+  player.maxHp = ts.hp;
+  player.hp = ts.hp;
+  player.speed = player.speed * ts.speed;
+  player.shield = ts.shield;
+  player.diffDmgMult = ts.dmg;
+  player.color = (ownedColors.indexOf(selectedP1Color) !== -1) ? selectedP1Color : ts.color;
+
+  var SEG = 800;
+  for (var L = 1; L <= 20; L++) {
+    var segX = (L - 1) * SEG;
+    var st = campaignEnemyStats(L);
+    var nTanks = Math.min(1 + Math.floor((L - 1) / 2), 12);
+    if (L >= 15) nTanks += 2;
+    var span = SEG - 240;
+    for (var t = 0; t < nTanks; t++) {
+      var tx = segX + 130 + (span * (t + 0.5)) / Math.max(1, nTanks);
+      if (L >= 5 && Math.abs(tx - (segX + 620)) < 140) tx = segX + 480;
+      var ty = 125 + Math.random() * 255;
+      if (ty > 360) ty = 360;
+      var nameIdx = (t + L * 3) % aiNames.length;
+      var ai = new RobotArena(aiNames[nameIdx], tx, ty, false);
+      ai.hp = st.hp; ai.maxHp = st.hp;
+      ai.speed = ai.speed * st.speed;
+      ai.diffDmgMult = st.dmg;
+      ai.aiCooldown = st.cooldown + Math.random() * 18;
+      ai.spawnX = tx; ai.spawnY = ty;
+      ai.activated = false;
+      ai.leashR = 180;
+      ai.level = L;
+      enemies.push(ai);
+    }
+    if (L >= 5) {
+      var wallHp = 140 + L * 10;
+      if (L >= 15) wallHp = Math.round(wallHp * 1.2);
+      campaignWalls.push({
+        x: segX + 620, y: H / 2, w: 46, h: 330,
+        hp: wallHp, maxHp: wallHp, level: L,
+        dmg: 0.8 + L * 0.04, shootCooldown: 30 + Math.random() * 20, turretAngle: Math.PI
+      });
+    }
+    if (L >= 10) {
+      var nB = L >= 15 ? 2 : 1;
+      for (var b = 0; b < nB; b++) {
+        var bx = segX + 190 + Math.random() * 360;
+        if (L >= 5 && Math.abs(bx - (segX + 620)) < 150) bx = segX + 300;
+        var bunk = new RobotArena("BUNKER", bx, 135 + Math.random() * 230, false);
+        var bhp = 260 + L * 15;
+        if (L >= 15) bhp = Math.round(bhp * 1.2);
+        bunk.w = 54;
+        bunk.hp = bhp; bunk.maxHp = bhp;
+        bunk.speed = 0;
+        bunk.diffDmgMult = L >= 15 ? 1.5 : 1.15;
+        bunk.aiCooldown = 30 + Math.random() * 20;
+        bunk.bunkerWeapon = true;
+        bunk.activated = false;
+        bunk.leashR = 0;
+        bunk.level = L;
+        bunk.color = "#8844cc";
+        enemies.push(bunk);
+      }
+    }
+  }
+  campaignBase = new RobotArena("ENEMY BASE", campaignWorldW - 150, H / 2, false);
+  campaignBase.w = 80;
+  campaignBase.maxHp = 2400;
+  campaignBase.hp = 2400;
+  campaignBase.speed = 0;
+  campaignBase.diffDmgMult = 1.5;
+  campaignBase.aiCooldown = 24;
+  campaignBase.isBase = true;
+  campaignBase.activated = false;
+  campaignBase.leashR = 0;
+  campaignBase.level = 20;
+  campaignBase.color = "#bb2233";
+  enemies.push(campaignBase);
+
+  projectiles = []; explosions = []; particles = []; sparks = []; hitTexts = [];
+  selectedWeapon = 0; canShoot = true; shootCooldown = 0;
+  comboCount = 0; comboTimer = 0; roundCount = 0; killCount = 0;
+  screenShake.intensity = 0;
+  gameActive = true;
+
+  document.getElementById('startScreen').style.display = 'none';
+  var fireBtn = document.getElementById('fireBtn');
+  var fireBtnP2 = document.getElementById('fireBtnP2');
+  if (controlMode === 'touch') {
+    fireBtn.classList.add('show');
+    fireBtnP2.classList.remove('show');
+    document.getElementById('controlsHint').innerHTML = 'Joystick = drive + aim &nbsp;|&nbsp; Release = shoot &nbsp;|&nbsp; Tap = auto-aim &nbsp;|&nbsp; Red button = fire';
+    document.querySelector('.weapon-bar').classList.add('touch-mode');
+  } else {
+    fireBtn.classList.remove('show');
+    fireBtnP2.classList.remove('show');
+    document.getElementById('controlsHint').innerHTML = '<kbd>W A S D</kbd> move &nbsp;|&nbsp; <kbd>1-5</kbd> weapon &nbsp;|&nbsp; <kbd>Click</kbd> / <kbd>Space</kbd> fire';
+    document.querySelector('.weapon-bar').classList.remove('touch-mode');
+  }
+  updateWeaponBar();
+  buildEnemyHpBars();
+  updateHP();
+}
+
 function startGame() {
+  if (checkDeviceBlocked()) return;
   loadMoney();
   var input = document.getElementById('nameInput');
   var pName = input ? input.value.trim() || "MechWarrior" : "MechWarrior";
   if (gameMode === 'multi') { startGameMP(); return; }
+  if (gameMode === 'campaign') { startCampaign(); return; }
   var ts = loggedInUser ? getTankStats() : { hp:200, speed:1.0, shield:0, dmg:1.0, color:'#88ccff' };
   player = new RobotArena(pName, 150, 250, true);
   player.maxHp = ts.hp;
@@ -2018,7 +2395,7 @@ function startGame() {
   player.speed = player.speed * ts.speed;
   player.shield = ts.shield;
   player.diffDmgMult = ts.dmg;
-  player.color = (gameMode === 'local2p' && ownedColors.indexOf(selectedP1Color) !== -1) ? selectedP1Color : ts.color;
+  player.color = (ownedColors.indexOf(selectedP1Color) !== -1) ? selectedP1Color : ts.color;
   enemies = [];
   var pvpMode = gameMode === 'local2p' && local2pPvP;
   var totalEnemies = pvpMode ? 0 : enemyCount;
@@ -2100,6 +2477,11 @@ function startGame() {
 
 function buildEnemyHpBars() {
   var container = document.getElementById('enemyHpRows');
+  if (gameMode === 'campaign') {
+    container.innerHTML = '';
+    lastEnemyBarCount = enemies.length;
+    return;
+  }
   if (gameMode === 'local2p' && local2pPvP) {
     container.innerHTML = '';
     return;
@@ -2218,8 +2600,7 @@ document.getElementById('fireBtnP2').addEventListener('mouseup', function(e) {
 });
 
 function playerShootAt(x, y) {
-  mouseX = x; mouseY = y;
-  playerShoot();
+  firePlayerAt(worldX(x), y);
 }
 
 function playerShootAuto() {
@@ -2237,8 +2618,8 @@ function playerShootAuto() {
     var d = dx*dx + dy*dy;
     if (d < nearDist) { nearDist = d; nearest = enemies[ei]; }
   }
-  if (nearest) { mouseX = nearest.x; mouseY = nearest.y; }
-  playerShoot();
+  if (nearest) { player.turretAngle = Math.atan2(nearest.y - player.y, nearest.x - player.x); firePlayerAt(nearest.x, nearest.y); }
+  else playerShoot();
 }
 
 function player2ShootAuto() {
@@ -2264,7 +2645,7 @@ function player2ShootAuto() {
 
 // Fire button auto-fire in game loop
 
-function playerShoot() {
+function firePlayerAt(wx, wy) {
   var loadout = (loggedInUser && ownedWeapons.length > 5) ? lobbyLoadout : [0,1,2,3,4];
   var w = weapons[loadout[selectedWeapon]] || weapons[0];
   if (w.special === "defend") {
@@ -2277,15 +2658,18 @@ function playerShoot() {
     updateHP();
     return;
   }
-  var spread = w.special === "multi" ? 50 : 20;
-  var tx = mouseX;
-  var ty = mouseY;
+  var tx = wx;
+  var ty = wy;
   var angle = player.turretAngle;
   fireProjectile(player.x, player.y, tx, ty, w, player);
   player.shootFlash = 8;
   canShoot = false;
   shootCooldown = (w.special === "multi" || w.special === "burst") ? 28 : 15;
   if (gameMode === 'multi') sendShot(player.x, player.y, angle, loadout[selectedWeapon]);
+}
+
+function playerShoot() {
+  firePlayerAt(worldX(mouseX), mouseY);
 }
 
 function player2Shoot() {
@@ -2331,7 +2715,8 @@ function checkHit(proj) {
     if (!t.alive()) continue;
     var dx = proj.x - t.x;
     var dy = proj.y - t.y;
-    if (Math.sqrt(dx * dx + dy * dy) < 32) return t;
+    var hitR = Math.max(30, (t.w || 40) * 0.45 + 14);
+    if (Math.sqrt(dx * dx + dy * dy) < hitR) return t;
   }
   return null;
 }
@@ -2421,13 +2806,12 @@ function processHits() {
     updateHP();
     if (!target.alive()) {
       killCount++;
-      xp += 15;
+      xp += 5;
       saveShopData();
-      if (gameMode !== 'multi') {
-        var reward = (difficulty + 1) * 1000;
-        money += reward;
+      if (gameMode !== 'multi' && gameMode !== 'campaign') {
+        money += 100;
         saveMoney();
-        addHitText(target.x, target.y - 30, '+' + reward + '$', '#ffdd44');
+        addHitText(target.x, target.y - 30, '+100$', '#ffdd44');
       }
       updateHP();
       createExplosion(target.x, target.y, "#ff8800", 60, true);
@@ -2441,6 +2825,17 @@ function processHits() {
 
 function addHitText(x, y, text, color) {
   hitTexts.push({ x: x, y: y, text: text, color: color, life: 40, maxLife: 40, vy: -2 });
+}
+
+function shadeColor(hex, pct) {
+  if (typeof hex !== 'string') return '#888888';
+  var m = hex.match(/^#?([0-9a-f]{6})$/i);
+  if (!m) return '#888888';
+  var num = parseInt(m[1], 16);
+  var r = (num >> 16) & 255, g = (num >> 8) & 255, b = num & 255;
+  if (pct < 0) { r = Math.round(r * (1 + pct)); g = Math.round(g * (1 + pct)); b = Math.round(b * (1 + pct)); }
+  else { r = Math.round(r + (255 - r) * pct); g = Math.round(g + (255 - g) * pct); b = Math.round(b + (255 - b) * pct); }
+  return 'rgb(' + r + ',' + g + ',' + b + ')';
 }
 
 function allEnemiesDead() {
@@ -2499,6 +2894,39 @@ function checkGameOver() {
     }
     if (!player.alive() && (!player2 || !player2.alive())) {
       return endPvpGame('\u2694 DRAW', 'Both tanks destroyed...', false);
+    }
+    return false;
+  }
+  if (gameMode === 'campaign') {
+    if (!player.alive()) {
+      gameActive = false; saveMoney(); saveProfileStats();
+      setTimeout(function() {
+        var overlay = document.getElementById('gameOverlay');
+        var title = document.getElementById('resultTitle');
+        var msg = document.getElementById('resultMsg');
+        var rounds = document.getElementById('resultRounds');
+        if (title) { title.textContent = "\uD83D\uDC80 DEFEATED"; title.className = 'lose'; }
+        if (msg) msg.textContent = player.name + ' was destroyed on level ' + campaignLevel + ' (' + killCount + ' kills)';
+        if (rounds) rounds.textContent = 'The enemy base is still standing...';
+        if (overlay) overlay.classList.add('show');
+      }, 500);
+      return true;
+    }
+    if (campaignBase && !campaignBase.alive()) {
+      money += 10000;
+      saveMoney();
+      gameActive = false; saveMoney(); saveProfileStats();
+      setTimeout(function() {
+        var overlay = document.getElementById('gameOverlay');
+        var title = document.getElementById('resultTitle');
+        var msg = document.getElementById('resultMsg');
+        var rounds = document.getElementById('resultRounds');
+        if (title) { title.textContent = "\uD83C\uDFC6 VICTORY!"; title.className = 'win'; }
+        if (msg) msg.textContent = player.name + ' destroyed the ENEMY BASE! All 20 levels conquered!';
+        if (rounds) rounds.textContent = '+10000$ reward | ' + killCount + ' enemy units destroyed along the path';
+        if (overlay) overlay.classList.add('show');
+      }, 500);
+      return true;
     }
     return false;
   }
@@ -2607,9 +3035,14 @@ function updateHP() {
   if (mel) mel.textContent = '$' + money;
   var ec = document.getElementById('enemyCount');
   if (ec) {
-    var alive = 0;
-    for (var ei = 0; ei < enemies.length; ei++) { if (enemies[ei].alive()) alive++; }
-    ec.textContent = alive + ' enemy' + (alive !== 1 ? 'ies' : '') + ' remaining';
+    if (gameMode === 'campaign') {
+      var baseHp = campaignBase ? Math.max(0, Math.ceil(campaignBase.hp)) : 0;
+      ec.textContent = 'LEVEL ' + campaignLevel + '/20   |   BASE HP ' + baseHp;
+    } else {
+      var alive = 0;
+      for (var ei = 0; ei < enemies.length; ei++) { if (enemies[ei].alive()) alive++; }
+      ec.textContent = alive + ' enemy' + (alive !== 1 ? 'ies' : '') + ' remaining';
+    }
   }
 }
 
@@ -2630,6 +3063,22 @@ function updateAI() {
       if (td < minDist) { minDist = td; target = targets[ti]; }
     }
     if (!ai.alive()) continue;
+    if (gameMode === 'campaign') {
+      if (!ai.activated) {
+        var pdx0 = player.x - ai.x, pdy0 = player.y - ai.y;
+        if (Math.sqrt(pdx0*pdx0 + pdy0*pdy0) < 440) ai.activated = true;
+        else continue;
+      }
+      if (ai.leashR && ai.spawnX !== undefined && !ai.isBase) {
+        var stray = Math.sqrt((ai.x - ai.spawnX)*(ai.x - ai.spawnX) + (ai.y - ai.spawnY)*(ai.y - ai.spawnY));
+        var pdx1 = target.x - ai.x, pdy1 = target.y - ai.y;
+        var pd1 = Math.sqrt(pdx1*pdx1 + pdy1*pdy1);
+        if (stray > ai.leashR && pd1 > 200) { ai.targetX = ai.spawnX; ai.targetY = ai.spawnY; }
+        else if (pd1 < 120) { ai.targetX = ai.x - pdx1/pd1 * 60; ai.targetY = ai.y - pdy1/pd1 * 60; }
+        else if (pd1 > 340) { ai.targetX = ai.x + pdx1/pd1 * 40; ai.targetY = ai.y + pdy1/pd1 * 40; }
+        else if (Math.random() < 0.02) { ai.targetX = target.x + (Math.random() - 0.5) * 200; ai.targetY = target.y + (Math.random() - 0.5) * 150; }
+      }
+    }
     ai.aiCooldown--;
     var dx = target.x - ai.x;
     var dy = target.y - ai.y;
@@ -2645,12 +3094,18 @@ function updateAI() {
       ai.targetX = target.x + (Math.random() - 0.5) * 250;
       ai.targetY = target.y + (Math.random() - 0.5) * 200;
     }
-    ai.targetX = Math.max(380, Math.min(W - 30, ai.targetX));
+    if (gameMode === 'campaign') {
+      ai.targetX = Math.max(35, Math.min(campaignWorldW - 30, ai.targetX));
+    } else {
+      ai.targetX = Math.max(380, Math.min(W - 30, ai.targetX));
+    }
     ai.targetY = Math.max(55, Math.min(H - 30, ai.targetY));
 
     if (ai.aiCooldown <= 0 && dist < 550) {
       var choice;
-      if (ai.hp <= 25) choice = 2;
+      if (ai.bunkerWeapon) choice = 9;
+      else if (ai.isBase) choice = Math.random() < 0.6 ? 1 : 0;
+      else if (ai.hp <= 25) choice = 2;
       else if (target.hp <= 20 && Math.random() < 0.8) choice = 1;
       else if (target.hp > 70) choice = Math.random() < 0.6 ? 0 : 4;
       else if (Math.random() < 0.2) choice = 3;
@@ -2676,6 +3131,7 @@ function updateAI() {
 }
 
 function updateProjectiles() {
+  var worldBound = (gameMode === 'campaign') ? campaignWorldW : W;
   for (var i = projectiles.length - 1; i >= 0; i--) {
     var p = projectiles[i];
     p.trail.push({ x: p.x, y: p.y });
@@ -2685,7 +3141,32 @@ function updateProjectiles() {
     p.vx *= 0.997;
     p.vy *= 0.997;
     p.life--;
-    if (p.life <= 0 || p.x < -30 || p.x > W + 30 || p.y < -30 || p.y > H + 30) {
+    if (gameMode === 'campaign' && p.attacker && p.attacker.isPlayer && campaignWalls.length) {
+      var wallHit = null;
+      for (var wi = 0; wi < campaignWalls.length; wi++) {
+        var wl = campaignWalls[wi];
+        if (wl.hp <= 0) continue;
+        if (p.x > wl.x - wl.w/2 && p.x < wl.x + wl.w/2 && p.y > wl.y - wl.h/2 && p.y < wl.y + wl.h/2) { wallHit = wl; break; }
+      }
+      if (wallHit) {
+        var wcap = Math.max(1, Math.ceil(wallHit.maxHp / 5));
+        var wdmg = Math.min(Math.max(1, Math.round((p.damage || 0) * (player.diffDmgMult || 1))), wcap);
+        wallHit.hp -= wdmg;
+        createExplosion(p.x, p.y, "#bbbbbb", 10, false);
+        addHitText(wallHit.x, wallHit.y - wallHit.h/2 - 6, '-' + wdmg, "#cccccc");
+        if (wallHit.hp <= 0) {
+          createExplosion(wallHit.x, wallHit.y, "#ffaa44", 60, true);
+          createExplosion(wallHit.x, wallHit.y, "#ff8800", 40, true);
+          screenShake.intensity = 12;
+          addHitText(wallHit.x, wallHit.y, "WALL DESTROYED!", "#ffaa44");
+        }
+        if (p.weapon.special !== 'pierce') {
+          projectiles.splice(i, 1);
+          continue;
+        }
+      }
+    }
+    if (p.life <= 0 || p.x < -30 || p.x > worldBound + 30 || p.y < -30 || p.y > H + 30) {
       createExplosion(p.x, p.y, "#666688", 5, false);
       projectiles.splice(i, 1);
     }
@@ -2788,6 +3269,7 @@ function drawJoystickSingle(stick, color) {
 }
 
 function drawArena() {
+  if (gameMode === 'campaign') { drawCampaignArena(); return; }
   if (bgLoaded) {
     ctx.drawImage(bgImage, 0, 0, W, H);
   } else {
@@ -2798,6 +3280,148 @@ function drawArena() {
   ctx.strokeStyle = 'rgba(255,255,255,0.15)';
   ctx.lineWidth = 2;
   ctx.strokeRect(0, 0, W, H);
+}
+
+function drawCampaignArena() {
+  var v0 = camX - 10, v1 = camX + W + 10;
+  ctx.fillStyle = '#0d0d1f';
+  ctx.fillRect(v0, 0, v1 - v0, H);
+  if (bgLoaded) {
+    for (var x0 = Math.floor(v0 / W) * W; x0 < v1; x0 += W) {
+      ctx.drawImage(bgImage, x0, 0, W, H);
+    }
+  } else {
+    var grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, '#1a1a3a'); grad.addColorStop(0.5, '#12122a'); grad.addColorStop(1, '#080818');
+    ctx.fillStyle = grad; ctx.fillRect(v0, 0, v1 - v0, H);
+  }
+  ctx.fillStyle = 'rgba(18,18,32,0.45)';
+  ctx.fillRect(v0, 120, v1 - v0, 280);
+  ctx.strokeStyle = 'rgba(255,220,80,0.28)';
+  ctx.setLineDash([18, 14]);
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(v0, 260); ctx.lineTo(v1, 260); ctx.stroke();
+  ctx.setLineDash([]);
+  for (var s = 1; s < 20; s++) {
+    var fxx = s * 800;
+    if (fxx < v0 - 20 || fxx > v1 + 20) continue;
+    ctx.strokeStyle = 'rgba(120,160,255,0.22)';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(fxx, 40); ctx.lineTo(fxx, H - 40); ctx.stroke();
+    ctx.fillStyle = 'rgba(140,180,255,0.5)';
+    ctx.beginPath(); ctx.arc(fxx, 40, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.font = '10px monospace'; ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.textAlign = 'center';
+    ctx.fillText('' + s, fxx, 24);
+  }
+  drawCampaignWalls();
+}
+
+function drawCampaignWalls() {
+  for (var i = 0; i < campaignWalls.length; i++) {
+    var wl = campaignWalls[i];
+    if (wl.x < camX - 100 || wl.x > camX + W + 100) continue;
+    if (wl.hp <= 0) {
+      ctx.fillStyle = 'rgba(90,90,110,0.5)';
+      ctx.beginPath(); ctx.arc(wl.x, wl.y, 42, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(60,60,80,0.5)';
+      for (var rj = 0; rj < 5; rj++) {
+        ctx.beginPath(); ctx.arc(wl.x + (rj * 37 % 50) - 25, wl.y + (rj * 23 % 60) - 30, 5 + rj, 0, Math.PI * 2); ctx.fill();
+      }
+      continue;
+    }
+    var pct = wl.hp / wl.maxHp;
+    ctx.save();
+    ctx.translate(wl.x, wl.y);
+    var wgrad = ctx.createLinearGradient(-wl.w/2, 0, wl.w/2, 0);
+    wgrad.addColorStop(0, (Math.floor(pct * 6) % 2) ? '#3a3a4a' : '#45455a');
+    wgrad.addColorStop(1, (Math.floor(pct * 6) % 2) ? '#2a2a3a' : '#35354a');
+    ctx.fillStyle = wgrad;
+    ctx.fillRect(-wl.w/2, -wl.h/2, wl.w, wl.h);
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-wl.w/2, -wl.h/2, wl.w, wl.h);
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 1;
+    for (var by = -wl.h/2 + 20; by < wl.h/2 - 10; by += 20) {
+      ctx.beginPath(); ctx.moveTo(-wl.w/2, by); ctx.lineTo(wl.w/2, by); ctx.stroke();
+    }
+    if (pct < 0.7) {
+      ctx.strokeStyle = 'rgba(255,120,60,' + (0.35 + (1 - pct) * 0.6) + ')';
+      ctx.lineWidth = 2;
+      var crk = ((wl.level * 37) % 40) - 20;
+      ctx.beginPath(); ctx.moveTo(crk, -wl.h/2); ctx.quadraticCurveTo(crk * 2, 0, 0, wl.h/2); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(0, -wl.h/2 + 12, 12, 0, Math.PI * 2); ctx.fillStyle = '#222233'; ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(0, -wl.h/2 + 12, 12, 0, Math.PI * 2); ctx.stroke();
+    ctx.save();
+    ctx.rotate(wl.turretAngle);
+    ctx.strokeStyle = '#111122'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(0, -wl.h/2 + 12); ctx.lineTo(34, -wl.h/2 + 12); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = '#cc4444'; ctx.beginPath(); ctx.arc(0, -wl.h/2 + 12, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = 'bold 11px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('WALL ' + wl.level, 0, -wl.h/2 - 12);
+    ctx.restore();
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(wl.x - wl.w/2, wl.y - wl.h/2 - 28, wl.w, 6);
+    ctx.fillStyle = pct > 0.5 ? '#66ff66' : pct > 0.25 ? '#ffcc44' : '#ff4444';
+    ctx.fillRect(wl.x - wl.w/2, wl.y - wl.h/2 - 28, wl.w * pct, 6);
+  }
+}
+
+function updateCampaignWalls() {
+  if (gameMode !== 'campaign' || !gameActive || !player || !player.alive()) return;
+  for (var i = 0; i < campaignWalls.length; i++) {
+    var wl = campaignWalls[i];
+    if (wl.hp <= 0) continue;
+    wl.turretAngle = Math.atan2(player.y - (wl.y - wl.h/2 + 12), player.x - wl.x);
+    wl.shootCooldown--;
+    if (wl.shootCooldown <= 0) {
+      var pdist = Math.hypot(player.x - wl.x, player.y - wl.y);
+      if (pdist < 560) {
+        fireProjectile(wl.x, wl.y - wl.h/2 + 12, player.x + (Math.random() - 0.5) * 30, player.y + (Math.random() - 0.5) * 20, weapons[Math.random() < 0.5 ? 1 : 0], { isPlayer: false, diffDmgMult: wl.dmg });
+      }
+      wl.shootCooldown = 44 - Math.min(22, wl.level);
+    }
+  }
+}
+
+function drawCampaignHUD() {
+  if (!gameActive || !player) return;
+  ctx.save();
+  ctx.font = 'bold 16px monospace';
+  ctx.textAlign = 'center';
+  if (campaignBanner > 0) {
+    ctx.globalAlpha = Math.min(1, campaignBanner / 40);
+    ctx.fillStyle = '#ffcc44';
+    ctx.shadowColor = '#ffcc44'; ctx.shadowBlur = 20;
+    ctx.fillText('\u2014 LEVEL ' + campaignLevel + ' / 20 \u2014', W/2, 50);
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+  } else {
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.fillText('LEVEL ' + campaignLevel + '/20', W/2, 26);
+  }
+  var bw = W - 90, bx = 45;
+  var prog = Math.max(0, Math.min(1, (player.x - 60) / (campaignWorldW - 60)));
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.fillRect(bx, 62, bw, 6);
+  ctx.fillStyle = '#44ccff';
+  ctx.fillRect(bx, 62, bw * prog, 6);
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.fillRect(bx + bw * prog - 1, 56, 3, 18);
+  if (campaignBase) {
+    var bhp = Math.max(0, Math.round(campaignBase.hp));
+    ctx.fillStyle = 'rgba(255,110,110,0.85)';
+    ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('BASE ' + bhp + '/' + campaignBase.maxHp, W - 14, 74);
+    ctx.fillStyle = 'rgba(120,0,0,0.4)';
+    ctx.fillRect(W - 230, 80, 216, 5);
+    ctx.fillStyle = bhp > 800 ? '#ff4444' : '#ff8800';
+    ctx.fillRect(W - 230, 80, 216 * (bhp / campaignBase.maxHp), 5);
+  }
+  ctx.restore();
 }
 
 function drawParticles() {
@@ -2863,14 +3487,15 @@ function drawHitTexts() {
 
 function drawAimLine() {
   if (!player || !player.alive() || !aimActive) return;
+  var ax2 = worldX(aimX);
   ctx.save();
   ctx.strokeStyle = aimDragged ? 'rgba(255,100,100,0.5)' : 'rgba(255,255,100,0.3)';
   ctx.lineWidth = aimDragged ? 1.5 : 1;
   ctx.setLineDash([6, 8]);
-  ctx.beginPath(); ctx.moveTo(player.x, player.y); ctx.lineTo(aimX, aimY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(player.x, player.y); ctx.lineTo(ax2, aimY); ctx.stroke();
   ctx.setLineDash([]);
   ctx.fillStyle = 'rgba(255,255,100,0.4)';
-  ctx.beginPath(); ctx.arc(aimX, aimY, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(ax2, aimY, 4, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 }
 
@@ -2884,6 +3509,13 @@ function gameLoop() {
 
   ctx.save();
   ctx.translate(screenShake.x, screenShake.y);
+  if (gameMode === 'campaign' && gameActive && player) {
+    camX = Math.max(0, Math.min(player.x - W * 0.35, campaignWorldW - W));
+    ctx.translate(-camX, 0);
+    var lv = Math.max(1, Math.min(20, Math.floor(player.x / 800) + 1));
+    if (lv !== campaignLevel) { campaignLevel = lv; campaignBanner = 90; }
+    if (campaignBanner > 0) campaignBanner--;
+  }
   ctx.clearRect(-10, -10, W + 20, H + 20);
   drawArena();
   if (gameModeType === 'koth') {
@@ -2915,6 +3547,7 @@ function gameLoop() {
     if (comboTimer > 0) comboTimer--;
     if (controlMode === 'touch' && fireBtnHeld && canShoot && player && player.alive()) playerShoot();
     if (local2pTouchMode && (gameMode === 'local2p' || local2pOnline) && fireBtn2Held && canShoot2 && player2 && player2.alive()) player2Shoot();
+    updateCampaignWalls();
     updateAI();
     updateProjectiles();
     player.update();
@@ -3049,6 +3682,7 @@ function gameLoop() {
   if (player && player.alive()) player.draw();
   if (player2 && player2.alive()) player2.draw();
   for (var ei3 = 0; ei3 < enemies.length; ei3++) {
+    if (gameMode === 'campaign' && (enemies[ei3].x < camX - 60 || enemies[ei3].x > camX + W + 60)) continue;
     if (enemies[ei3].alive()) {
       enemies[ei3].draw();
       // Label above opponent
@@ -3071,6 +3705,7 @@ function gameLoop() {
 
   if (gameActive) drawHUD();
   ctx.restore();
+  if (gameActive && gameMode === 'campaign') drawCampaignHUD();
   if ((controlMode === 'touch' || (local2pTouchMode && (gameMode === 'local2p' || local2pOnline))) && (joystick.active || p2Joystick.active)) drawJoystick();
   updateHP();
   requestAnimationFrame(gameLoop);
@@ -3140,6 +3775,14 @@ async function registerAccount() {
     showAccountStatus('Error: ' + error.message); return;
   }
   loggedInUser = user; profileId = data.id;
+  money = data.money || 0; xp = 0; killCount = 0;
+  ownedTanks = ['default']; selectedTankId = 'default'; upgradeLevels = {};
+  ownedWeapons = [0,1,2,3,4]; lobbyLoadout = [0,1,2,3,4];
+  ownedColors = ['#88ccff']; selectedP1Color = '#88ccff'; selectedP2Color = '#ff8844';
+  try { localStorage.removeItem('rp_shop_' + user); } catch(e) {}
+  try { localStorage.removeItem('rp_remember'); } catch(e) {}
+  try { localStorage.removeItem('rp_money'); } catch(e) {}
+  saveMoney();
   rememberDevice(user, hash);
   onLogin();
 }
@@ -3186,6 +3829,271 @@ function logoutAccount() {
   if (ab) ab.style.display = 'flex';
   if (mel) mel.textContent = '$0';
 }
+
+async function resetAccount() {
+  if (!loggedInUser) return;
+  var uname = loggedInUser;
+  if (!confirm('Reset account "' + uname + '" completely?\nThis deletes the profile and everything you bought. This cannot be undone.')) return;
+  initSupabase();
+  if (supabaseClient && profileId) {
+    try { await supabaseClient.from('profiles').delete().eq('id', profileId); } catch(e) {}
+  }
+  try { localStorage.removeItem('rp_shop_' + loggedInUser); } catch(e) {}
+  try { localStorage.removeItem('rp_remember'); } catch(e) {}
+  try { localStorage.removeItem('rp_money'); } catch(e) {}
+  loggedInUser = null; profileId = null; money = 0; xp = 0; killCount = 0;
+  ownedTanks = ['default']; selectedTankId = 'default'; upgradeLevels = {};
+  ownedWeapons = [0,1,2,3,4]; lobbyLoadout = [0,1,2,3,4];
+  ownedColors = ['#88ccff']; selectedP1Color = '#88ccff'; selectedP2Color = '#ff8844';
+  shopTab = 'tanks';
+  var ai = document.getElementById('accountInfo');
+  var ab = document.getElementById('accountBtns');
+  var mel = document.getElementById('moneyDisplay');
+  var lm = document.getElementById('lobbyMoneySmall');
+  var sm = document.getElementById('shopMoney');
+  if (ai) ai.style.display = 'none';
+  if (ab) ab.style.display = 'flex';
+  if (mel) mel.textContent = '$0';
+  if (lm) lm.textContent = '$0';
+  if (sm) sm.textContent = '$0  |  Lv.1 (0XP)';
+  updateLobbyXp();
+  updateLobbyWeapons();
+  alert('Account "' + uname + '" reset. You can now register again.');
+}
+
+// ---- DEV ADMIN PANEL ----
+var ADMIN_PASS = 'Tala-1802';
+function adminAuthed() { try { return sessionStorage.getItem('rp_admin_auth') === '1'; } catch(e) { return false; } }
+function showAdminLogin() {
+  if (adminAuthed()) { openAdminPanel(); return; }
+  var pass = prompt('Admin password:');
+  if (pass === null) return;
+  if (pass === ADMIN_PASS) {
+    try { sessionStorage.setItem('rp_admin_auth', '1'); } catch(e) {}
+    openAdminPanel();
+  } else { alert('Wrong password.'); }
+}
+function openAdminPanel() {
+  var ov = document.getElementById('adminOverlay');
+  if (!ov) return;
+  ov.classList.add('show');
+  var dl = document.getElementById('adminDeviceLabel');
+  if (dl) dl.textContent = 'DEV: ' + getDeviceId();
+  var mu = document.getElementById('adminMoneyUser');
+  if (mu && loggedInUser) mu.value = loggedInUser;
+  syncBlockedFromServer();
+  renderBlockedList();
+  renderErrorLog();
+}
+function closeAdminPanel() {
+  var ov = document.getElementById('adminOverlay');
+  if (ov) ov.classList.remove('show');
+}
+
+function getDeviceId() {
+  try {
+    var id = localStorage.getItem('rp_device_id');
+    if (!id) { id = 'dev-' + Math.random().toString(36).slice(2, 10) + '-' + Date.now().toString(36); localStorage.setItem('rp_device_id', id); }
+    return id;
+  } catch(e) { return 'dev-unknown'; }
+}
+function getBlockedDevices() {
+  try { var raw = localStorage.getItem('rp_blocked_devices'); return raw ? JSON.parse(raw) : []; } catch(e) { return []; }
+}
+function saveBlockedDevices(list) {
+  try { localStorage.setItem('rp_blocked_devices', JSON.stringify(list)); } catch(e) {}
+}
+function isDeviceBlocked(devId) {
+  return getBlockedDevices().some(function(b) { return b.id === devId; });
+}
+async function syncBlockedFromServer() {
+  initSupabase();
+  if (!supabaseClient) return;
+  try {
+    var { data, error } = await supabaseClient.from('admin_blocks').select('device_id, reason, created_at');
+    if (error) return;
+    var local = getBlockedDevices();
+    for (var i = 0; i < (data || []).length; i++) {
+      var id = data[i].device_id;
+      if (!local.some(function(b) { return b.id === id; })) {
+        local.push({ id: id, reason: data[i].reason || '', date: data[i].created_at || '' });
+      }
+    }
+    saveBlockedDevices(local);
+  } catch(e) {}
+}
+function checkDeviceBlocked() {
+  var dev = getDeviceId();
+  if (!isDeviceBlocked(dev)) return false;
+  gameActive = false;
+  var overlay = document.getElementById('gameOverlay');
+  var title = document.getElementById('resultTitle');
+  var msg = document.getElementById('resultMsg');
+  var rounds = document.getElementById('resultRounds');
+  if (title) { title.textContent = '\u26D4 DEVICE BLOCKED'; title.className = 'lose'; }
+  if (msg) msg.textContent = 'This device has been blocked from RobotPlanet.';
+  if (rounds) rounds.textContent = dev ? '(' + dev + ')' : '';
+  if (overlay) overlay.classList.add('show');
+  return true;
+}
+async function adminBlockDevice() {
+  var id = document.getElementById('blockDeviceId').value.trim();
+  var reason = document.getElementById('blockReason').value.trim();
+  if (!id) { alert('Enter a device id'); return; }
+  if (id === getDeviceId() && !confirm('This blocks YOUR current device. Continue?')) return;
+  var list = getBlockedDevices();
+  if (!list.some(function(b) { return b.id === id; })) {
+    list.push({ id: id, reason: reason, date: new Date().toISOString() });
+    saveBlockedDevices(list);
+  }
+  initSupabase();
+  if (supabaseClient) {
+    try {
+      var { error } = await supabaseClient.from('admin_blocks').upsert({ device_id: id, reason: reason }, { onConflict: 'device_id' });
+      if (error && (error.code === '42P01' || /does not exist/i.test(error.message || ''))) {
+        alert('Missing table. Run in Supabase SQL Editor:\nCREATE TABLE admin_blocks (device_id TEXT PRIMARY KEY, reason TEXT, created_at TIMESTAMP DEFAULT NOW());');
+      }
+    } catch(e) {}
+  }
+  renderBlockedList();
+}
+async function adminUnblockDevice(id) {
+  var list = getBlockedDevices().filter(function(b) { return b.id !== id; });
+  saveBlockedDevices(list);
+  initSupabase();
+  if (supabaseClient) {
+    try { await supabaseClient.from('admin_blocks').delete().eq('device_id', id); } catch(e) {}
+  }
+  renderBlockedList();
+}
+function adminBlockThisDevice() {
+  var el = document.getElementById('blockDeviceId');
+  if (el) el.value = getDeviceId();
+}
+function adminCopyDeviceId() {
+  var id = getDeviceId();
+  try { navigator.clipboard.writeText(id); } catch(e) {}
+  prompt('Device id:', id);
+}
+function renderBlockedList() {
+  var el = document.getElementById('blockedList');
+  if (!el) return;
+  var list = getBlockedDevices();
+  if (!list.length) { el.innerHTML = 'No blocked devices.'; return; }
+  var html = '';
+  for (var i = 0; i < list.length; i++) {
+    html += '<div style="display:flex;align-items:center;gap:6px;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.06);padding:3px 0">'
+      + '<span style="color:#ff8888;word-break:break-all">' + escapeHtml(list[i].id) + '</span>'
+      + '<span style="color:#888;flex-shrink:0">' + (list[i].reason ? '— ' + escapeHtml(list[i].reason) : '') + '</span>'
+      + '<button class="acc-btn" style="font-size:9px;padding:1px 6px;flex-shrink:0" onclick="adminUnblockDevice(\'' + list[i].id + '\')">Unblock</button></div>';
+  }
+  el.innerHTML = html;
+}
+async function adminResetAccount() {
+  var user = document.getElementById('adminResetUser').value.trim();
+  if (!user) { alert('Enter a username'); return; }
+  if (!confirm('Reset account "' + user + '"? Deletes the profile. Cannot be undone.')) return;
+  initSupabase();
+  if (!supabaseClient) { alert('Supabase not loaded.'); return; }
+  try {
+    var { error } = await supabaseClient.from('profiles').delete().eq('username', user);
+    if (error) { alert('Error: ' + error.message); return; }
+  } catch(e) { alert('Error: ' + e.message); return; }
+  try { localStorage.removeItem('rp_shop_' + user); } catch(e) {}
+  if (loggedInUser === user) {
+    loggedInUser = null; profileId = null;
+    try { localStorage.removeItem('rp_remember'); } catch(e) {}
+    var ai = document.getElementById('accountInfo');
+    var ab = document.getElementById('accountBtns');
+    if (ai) ai.style.display = 'none';
+    if (ab) ab.style.display = 'flex';
+  }
+  alert('Account "' + user + '" reset.');
+}
+async function adminMoney(mode) {
+  var user = document.getElementById('adminMoneyUser').value.trim() || (loggedInUser || '');
+  document.getElementById('adminMoneyUser').value = user;
+  var amt = parseInt(document.getElementById('adminMoneyAmount').value, 10);
+  if (!user) { alert('Enter a username'); return; }
+  if (isNaN(amt) || amt === 0) { alert('Enter an amount'); return; }
+  initSupabase();
+  if (!supabaseClient) { alert('Supabase not loaded.'); return; }
+  try {
+    var newMoney = amt;
+    if (mode !== 0) {
+      var { data, error } = await supabaseClient.from('profiles').select('money').eq('username', user).single();
+      if (error || !data) { alert('Account "' + user + '" not found.'); return; }
+      newMoney = (data.money || 0) + (mode > 0 ? amt : -amt);
+      if (newMoney < 0) newMoney = 0;
+    }
+    await supabaseClient.from('profiles').update({ money: newMoney }).eq('username', user);
+    if (loggedInUser === user) {
+      money = newMoney;
+      var lm = document.getElementById('lobbyMoneySmall');
+      var mel = document.getElementById('moneyDisplay');
+      var sm = document.getElementById('shopMoney');
+      if (lm) lm.textContent = '$' + money;
+      if (mel) mel.textContent = '$' + money;
+      if (sm) sm.textContent = '$' + money + '  |  Lv.' + getLevel(xp) + ' (' + xp + 'XP)';
+      saveMoney();
+      saveShopData();
+    }
+    alert('Account "' + user + '" now has $' + newMoney + '.');
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+// ---- ERROR LOG ----
+var errorLog = [];
+(function() {
+  try { var raw = localStorage.getItem('rp_error_log'); if (raw) errorLog = JSON.parse(raw); } catch(e) {}
+  window.onerror = function(msg, src, line, col, err) {
+    pushError(msg, (err && err.stack) ? err.stack : (src + ':' + line + ':' + col));
+    return false;
+  };
+  window.addEventListener('unhandledrejection', function(ev) {
+    var m = 'Unhandled promise rejection';
+    if (ev && ev.reason) m = (typeof ev.reason.message === 'string') ? ev.reason.message : String(ev.reason);
+    pushError(m, (ev && ev.reason && ev.reason.stack) ? ev.reason.stack : '');
+  });
+})();
+function pushError(msg, stack) {
+  errorLog.push({ time: new Date().toISOString(), msg: String(msg || '').substring(0, 500), stack: String(stack || '').substring(0, 500) });
+  if (errorLog.length > 200) errorLog = errorLog.slice(-200);
+  try { localStorage.setItem('rp_error_log', JSON.stringify(errorLog)); } catch(e) {}
+  var el = document.getElementById('errorLogList');
+  var cnt = document.getElementById('errCount');
+  if (cnt) cnt.textContent = '(' + errorLog.length + ')';
+  if (el && adminAuthed()) renderErrorLog();
+}
+function renderErrorLog() {
+  var el = document.getElementById('errorLogList');
+  if (!el) return;
+  var cnt = document.getElementById('errCount');
+  if (cnt) cnt.textContent = '(' + errorLog.length + ')';
+  if (!errorLog.length) { el.innerHTML = 'No errors logged.'; return; }
+  var html = '';
+  for (var i = errorLog.length - 1; i >= 0; i--) {
+    var e = errorLog[i];
+    html += '<div style="margin-bottom:6px"><span style="color:#888">' + new Date(e.time).toLocaleTimeString() + '</span> '
+      + '<b style="color:#ff7777">' + escapeHtml(e.msg) + '</b>'
+      + (e.stack ? '<div style="color:#cc8866;word-break:break-all">' + escapeHtml(e.stack) + '</div>' : '') + '</div>';
+  }
+  el.innerHTML = html;
+}
+function adminResetErrorLog() {
+  errorLog = [];
+  try { localStorage.setItem('rp_error_log', '[]'); } catch(e) {}
+  renderErrorLog();
+}
+function adminExportErrors() {
+  var lines = errorLog.map(function(e) { return '[' + e.time + '] ' + e.msg + (e.stack ? ' | ' + e.stack : ''); });
+  var blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'robotplanet_errors.txt';
+  a.click();
+}
+function escapeHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
 function rememberDevice(user, hash) {
   try { localStorage.setItem('rp_remember', JSON.stringify({user:user, hash:hash})); } catch(e) {}
@@ -3651,7 +4559,7 @@ function getTankStats() {
   }
   return { hp: hp, speed: speed, shield: shield, dmg: dmg, color: t.color };
 }
-setTimeout(function(){ if (typeof tryAutoLogin === 'function') tryAutoLogin(); }, 500);
+setTimeout(function(){ if (typeof applySavedSettings === 'function') applySavedSettings(); if (typeof tryAutoLogin === 'function') tryAutoLogin(); }, 500);
 setTimeout(function(){ if (typeof updateColorPickers === 'function') updateColorPickers(); }, 800);
 </script>
 </body>
