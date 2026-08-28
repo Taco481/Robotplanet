@@ -1809,8 +1809,10 @@ class RobotArena {
     }
     var bodyGrad = ctx.createLinearGradient(-s/2, 0, s/2, 0);
     if (this.isPlayer) {
-      bodyGrad.addColorStop(0, "#1a66aa"); bodyGrad.addColorStop(0.3, "#3388dd");
-      bodyGrad.addColorStop(0.7, "#3388dd"); bodyGrad.addColorStop(1, "#1a66aa");
+      var cDark = shadeColor(this.color, -0.35);
+      var cMid = shadeColor(this.color, 0.05);
+      bodyGrad.addColorStop(0, cDark); bodyGrad.addColorStop(0.3, cMid);
+      bodyGrad.addColorStop(0.7, cMid); bodyGrad.addColorStop(1, cDark);
     } else {
       bodyGrad.addColorStop(0, "#aa2222"); bodyGrad.addColorStop(0.3, "#dd4444");
       bodyGrad.addColorStop(0.7, "#dd4444"); bodyGrad.addColorStop(1, "#aa2222");
@@ -1845,7 +1847,7 @@ class RobotArena {
     ctx.save();
     ctx.rotate(this.turretAngle);
     var turretR = s/4.2;
-    ctx.fillStyle = this.isPlayer ? "#2277cc" : "#cc3333";
+    ctx.fillStyle = this.isPlayer ? shadeColor(this.color, 0.1) : "#cc3333";
     ctx.beginPath(); ctx.arc(0, 0, turretR, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(0, 0, turretR, 0, Math.PI * 2); ctx.stroke();
@@ -1853,7 +1855,7 @@ class RobotArena {
     ctx.beginPath(); ctx.arc(0, -2, turretR * 0.45, 0, Math.PI * 2); ctx.fill();
 
     var barrelLen = s/2 + 8;
-    ctx.strokeStyle = this.isPlayer ? "#1a5caa" : "#aa2828";
+    ctx.strokeStyle = this.isPlayer ? shadeColor(this.color, -0.25) : "#aa2828";
     ctx.lineWidth = 6; ctx.lineCap = "round";
     ctx.shadowColor = this.shootFlash > 0 ? "#ffdd44" : "transparent";
     ctx.shadowBlur = this.shootFlash > 0 ? 20 : 0;
@@ -2173,7 +2175,7 @@ function startCampaign() {
   player.speed = player.speed * ts.speed;
   player.shield = ts.shield;
   player.diffDmgMult = ts.dmg;
-  player.color = ts.color;
+  player.color = (ownedColors.indexOf(selectedP1Color) !== -1) ? selectedP1Color : ts.color;
 
   var SEG = 800;
   for (var L = 1; L <= 20; L++) {
@@ -2282,7 +2284,7 @@ function startGame() {
   player.speed = player.speed * ts.speed;
   player.shield = ts.shield;
   player.diffDmgMult = ts.dmg;
-  player.color = (gameMode === 'local2p' && ownedColors.indexOf(selectedP1Color) !== -1) ? selectedP1Color : ts.color;
+  player.color = (ownedColors.indexOf(selectedP1Color) !== -1) ? selectedP1Color : ts.color;
   enemies = [];
   var pvpMode = gameMode === 'local2p' && local2pPvP;
   var totalEnemies = pvpMode ? 0 : enemyCount;
@@ -2712,6 +2714,17 @@ function processHits() {
 
 function addHitText(x, y, text, color) {
   hitTexts.push({ x: x, y: y, text: text, color: color, life: 40, maxLife: 40, vy: -2 });
+}
+
+function shadeColor(hex, pct) {
+  if (typeof hex !== 'string') return '#888888';
+  var m = hex.match(/^#?([0-9a-f]{6})$/i);
+  if (!m) return '#888888';
+  var num = parseInt(m[1], 16);
+  var r = (num >> 16) & 255, g = (num >> 8) & 255, b = num & 255;
+  if (pct < 0) { r = Math.round(r * (1 + pct)); g = Math.round(g * (1 + pct)); b = Math.round(b * (1 + pct)); }
+  else { r = Math.round(r + (255 - r) * pct); g = Math.round(g + (255 - g) * pct); b = Math.round(b + (255 - b) * pct); }
+  return 'rgb(' + r + ',' + g + ',' + b + ')';
 }
 
 function allEnemiesDead() {
