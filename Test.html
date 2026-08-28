@@ -644,6 +644,7 @@
             <span id="lobbyMoneySmall" style="color:#ffdd44;font-weight:bold">$0</span>
             <button class="acc-btn" onclick="showShop()" style="font-size:9px;padding:2px 6px;background:rgba(255,221,68,0.2)">SHOP</button>
             <button class="acc-btn" onclick="logoutAccount()" style="font-size:9px;padding:2px 6px">✕</button>
+            <button class="acc-btn" onclick="resetAccount()" style="font-size:9px;padding:2px 6px;background:rgba(255,80,80,0.25)">RESET</button>
           </div>
         </div>
       </div>
@@ -3649,6 +3650,14 @@ async function registerAccount() {
     showAccountStatus('Error: ' + error.message); return;
   }
   loggedInUser = user; profileId = data.id;
+  money = data.money || 0; xp = 0; killCount = 0;
+  ownedTanks = ['default']; selectedTankId = 'default'; upgradeLevels = {};
+  ownedWeapons = [0,1,2,3,4]; lobbyLoadout = [0,1,2,3,4];
+  ownedColors = ['#88ccff']; selectedP1Color = '#88ccff'; selectedP2Color = '#ff8844';
+  try { localStorage.removeItem('rp_shop_' + user); } catch(e) {}
+  try { localStorage.removeItem('rp_remember'); } catch(e) {}
+  try { localStorage.removeItem('rp_money'); } catch(e) {}
+  saveMoney();
   rememberDevice(user, hash);
   onLogin();
 }
@@ -3694,6 +3703,37 @@ function logoutAccount() {
   if (ai) ai.style.display = 'none';
   if (ab) ab.style.display = 'flex';
   if (mel) mel.textContent = '$0';
+}
+
+async function resetAccount() {
+  if (!loggedInUser) return;
+  var uname = loggedInUser;
+  if (!confirm('Reset account "' + uname + '" completely?\nThis deletes the profile and everything you bought. This cannot be undone.')) return;
+  initSupabase();
+  if (supabaseClient && profileId) {
+    try { await supabaseClient.from('profiles').delete().eq('id', profileId); } catch(e) {}
+  }
+  try { localStorage.removeItem('rp_shop_' + loggedInUser); } catch(e) {}
+  try { localStorage.removeItem('rp_remember'); } catch(e) {}
+  try { localStorage.removeItem('rp_money'); } catch(e) {}
+  loggedInUser = null; profileId = null; money = 0; xp = 0; killCount = 0;
+  ownedTanks = ['default']; selectedTankId = 'default'; upgradeLevels = {};
+  ownedWeapons = [0,1,2,3,4]; lobbyLoadout = [0,1,2,3,4];
+  ownedColors = ['#88ccff']; selectedP1Color = '#88ccff'; selectedP2Color = '#ff8844';
+  shopTab = 'tanks';
+  var ai = document.getElementById('accountInfo');
+  var ab = document.getElementById('accountBtns');
+  var mel = document.getElementById('moneyDisplay');
+  var lm = document.getElementById('lobbyMoneySmall');
+  var sm = document.getElementById('shopMoney');
+  if (ai) ai.style.display = 'none';
+  if (ab) ab.style.display = 'flex';
+  if (mel) mel.textContent = '$0';
+  if (lm) lm.textContent = '$0';
+  if (sm) sm.textContent = '$0  |  Lv.1 (0XP)';
+  updateLobbyXp();
+  updateLobbyWeapons();
+  alert('Account "' + uname + '" reset. You can now register again.');
 }
 
 function rememberDevice(user, hash) {
