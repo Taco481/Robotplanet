@@ -661,10 +661,11 @@
             <button class="acc-btn" onclick="logoutAccount()" style="font-size:9px;padding:2px 6px">✕</button>
             <button class="acc-btn" onclick="resetAccount()" style="font-size:9px;padding:2px 6px;background:rgba(255,80,80,0.25)">RESET</button>
           </div>
+          <button class="acc-btn" onclick="showAdminLogin()" style="font-size:9px;padding:2px 6px">⚙ DEV</button>
         </div>
       </div>
 
-      <div class="lobby-footer">ROBOTPLANET v1.0 <button class="acc-btn" onclick="showAdminLogin()" style="font-size:9px;padding:2px 6px;margin-left:10px">⚙ DEV</button></div>
+      <div class="lobby-footer">ROBOTPLANET v1.0</div>
     </div>
     <div class="admin-overlay" id="adminOverlay">
       <div class="admin-panel">
@@ -703,8 +704,9 @@
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
             <input id="adminMoneyUser" class="admin-input" placeholder="username" style="flex:1;min-width:110px">
             <input id="adminMoneyAmount" class="admin-input" type="number" placeholder="amount" style="width:100px">
-            <button class="mp-btn" onclick="adminGiveMoney(1)" style="font-size:11px;padding:5px 12px">+ Give</button>
-            <button class="mp-btn secondary" onclick="adminGiveMoney(0)" style="font-size:11px;padding:5px 12px">= Set</button>
+            <button class="mp-btn" onclick="adminMoney(1)" style="font-size:11px;padding:5px 12px">+ Give</button>
+            <button class="mp-btn secondary" onclick="adminMoney(-1)" style="font-size:11px;padding:5px 12px">− Take</button>
+            <button class="mp-btn secondary" onclick="adminMoney(0)" style="font-size:11px;padding:5px 12px">= Set</button>
           </div>
         </div>
 
@@ -3971,7 +3973,7 @@ async function adminResetAccount() {
   }
   alert('Account "' + user + '" reset.');
 }
-async function adminGiveMoney(addMode) {
+async function adminMoney(mode) {
   var user = document.getElementById('adminMoneyUser').value.trim() || (loggedInUser || '');
   document.getElementById('adminMoneyUser').value = user;
   var amt = parseInt(document.getElementById('adminMoneyAmount').value, 10);
@@ -3981,10 +3983,11 @@ async function adminGiveMoney(addMode) {
   if (!supabaseClient) { alert('Supabase not loaded.'); return; }
   try {
     var newMoney = amt;
-    if (addMode) {
+    if (mode !== 0) {
       var { data, error } = await supabaseClient.from('profiles').select('money').eq('username', user).single();
       if (error || !data) { alert('Account "' + user + '" not found.'); return; }
-      newMoney = (data.money || 0) + amt;
+      newMoney = (data.money || 0) + (mode > 0 ? amt : -amt);
+      if (newMoney < 0) newMoney = 0;
     }
     await supabaseClient.from('profiles').update({ money: newMoney }).eq('username', user);
     if (loggedInUser === user) {
