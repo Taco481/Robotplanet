@@ -658,6 +658,7 @@
           <div class="account-info" id="accountInfo" style="display:none">
             <span id="lobbyXpSmall" style="color:#aaffaa;font-weight:bold;font-size:10px">Lv.1</span>
             <span id="lobbyMoneySmall" style="color:#ffdd44;font-weight:bold">$0</span>
+            <span id="offlineAccBadge" style="display:none;color:#888;font-size:9px;letter-spacing:1px">OFFLINE</span>
             <button class="acc-btn" onclick="showShop()" style="font-size:9px;padding:2px 6px;background:rgba(255,221,68,0.2)">SHOP</button>
             <button class="acc-btn" onclick="logoutAccount()" style="font-size:9px;padding:2px 6px">✕</button>
             <button class="acc-btn" onclick="resetAccount()" style="font-size:9px;padding:2px 6px;background:rgba(255,80,80,0.25)">RESET</button>
@@ -1153,7 +1154,7 @@ function updateOnlineUI() {
   if (!rpOnline && gameMode === 'multi') setGameMode('single');
 }
 if (typeof window !== 'undefined') {
-  window.addEventListener('online', function(){ rpOnline = true; updateOnlineUI(); });
+  window.addEventListener('online', function(){ rpOnline = true; updateOnlineUI(); if (offlineAccount && typeof tryAutoLogin === 'function' && !gameActive) tryAutoLogin(); });
   window.addEventListener('offline', function(){ rpOnline = false; updateOnlineUI(); });
 }
 var mpChannel, supabaseClient, roomCode, playerId, isHost, mpStateSendCounter = 0;
@@ -3818,13 +3819,24 @@ async function loginAccount() {
   var pass = document.getElementById('regPass').value;
   if (!user || !pass) { showAccountStatus('Enter username and password'); return; }
   initSupabase();
-  if (!supabaseClient) return;
+  if (!supabaseClient) {
+    if (offlineAccountLogin(user, btoa(pass))) { rememberDevice(user, btoa(pass)); return; }
+    showAccountStatus('No network and no offline account found on this device.');
+    return;
+  }
   var hash = btoa(pass);
   var { data, error } = await supabaseClient.from('profiles').select('*').eq('username', user).eq('password', hash).single();
-  if (error || !data) { showAccountStatus('Invalid username or password'); return; }
+  if (error) {
+    if (offlineAccountLogin(user, hash)) { rememberDevice(user, hash); return; }
+    showAccountStatus('Network error: ' + error.message);
+    return;
+  }
+  if (!data) { showAccountStatus('Invalid username or password'); return; }
+  offlineAccount = false;
   loggedInUser = user; profileId = data.id; money = data.money || 0; killCount = data.kills || 0; xp = data.xp || 0;
   if (data.shop_data) { try { var sd = JSON.parse(data.shop_data); if (sd.ownedTanks) ownedTanks = sd.ownedTanks; if (sd.ownedWeapons) ownedWeapons = sd.ownedWeapons; if (sd.ownedColors) ownedColors = sd.ownedColors; if (sd.upgradeLevels) upgradeLevels = sd.upgradeLevels; if (sd.selectedTank) selectedTankId = sd.selectedTank; if (sd.selectedP1Color) selectedP1Color = sd.selectedP1Color; if (sd.selectedP2Color) selectedP2Color = sd.selectedP2Color; if (sd.lobbyLoadout) lobbyLoadout = sd.lobbyLoadout; } catch(e) {} }
   rememberDevice(user, hash);
+  saveLocalProfileSnapshot();
   onLogin();
 }
 
@@ -3833,9 +3845,11 @@ function onLogin() {
   var ab = document.getElementById('accountBtns');
   var ai = document.getElementById('accountInfo');
   var lm = document.getElementById('lobbyMoneySmall');
+  var ob = document.getElementById('offlineAccBadge');
   if (ab) ab.style.display = 'none';
   if (ai) ai.style.display = 'flex';
   if (lm) lm.textContent = '$' + money;
+  if (ob) ob.style.display = offlineAccount ? 'inline' : 'none';
   getShopData();
   updateLobbyXp();
   // ensure loadout slots are owned
@@ -3846,14 +3860,16 @@ function onLogin() {
 }
 
 function logoutAccount() {
-  loggedInUser = null; profileId = null;
+  loggedInUser = null; profileId = null; offlineAccount = false;
   try { localStorage.removeItem('rp_remember'); } catch(e) {}
   var ai = document.getElementById('accountInfo');
   var ab = document.getElementById('accountBtns');
   var mel = document.getElementById('moneyDisplay');
+  var ob = document.getElementById('offlineAccBadge');
   if (ai) ai.style.display = 'none';
   if (ab) ab.style.display = 'flex';
   if (mel) mel.textContent = '$0';
+  if (ob) ob.style.display = 'none';
 }
 
 async function resetAccount() {
@@ -4132,21 +4148,56 @@ async function tryAutoLogin() {
     var d = JSON.parse(raw);
     if (!d.user || !d.hash) return;
     initSupabase();
-    if (!supabaseClient) return;
+    if (!supabaseClient) { offlineAccountLogin(d.user, d.hash); return; }
     var { data, error } = await supabaseClient.from('profiles').select('*').eq('username', d.user).eq('password', d.hash).single();
-    if (error || !data) { try { localStorage.removeItem('rp_remember'); } catch(e) {} return; }
+    if (error) { offlineAccountLogin(d.user, d.hash); return; }
+    if (!data) { try { localStorage.removeItem('rp_remember'); } catch(e) {} return; }
+    offlineAccount = false;
     loggedInUser = d.user; profileId = data.id; money = data.money || 0; killCount = data.kills || 0; xp = data.xp || 0;
     if (data.shop_data) { try { var sd = JSON.parse(data.shop_data); if (sd.ownedTanks) ownedTanks = sd.ownedTanks; if (sd.ownedWeapons) ownedWeapons = sd.ownedWeapons; if (sd.ownedColors) ownedColors = sd.ownedColors; if (sd.upgradeLevels) upgradeLevels = sd.upgradeLevels; if (sd.selectedTank) selectedTankId = sd.selectedTank; if (sd.selectedP1Color) selectedP1Color = sd.selectedP1Color; if (sd.selectedP2Color) selectedP2Color = sd.selectedP2Color; if (sd.lobbyLoadout) lobbyLoadout = sd.lobbyLoadout; } catch(e) {} }
+    saveLocalProfileSnapshot();
     onLogin();
   } catch(e) { try { localStorage.removeItem('rp_remember'); } catch(e2) {} }
+}
+
+var offlineAccount = false;
+function localProfileKey(u) { return 'rp_local_' + (u || ''); }
+function saveLocalProfileSnapshot() {
+  if (!loggedInUser) return;
+  try {
+    var shopData = JSON.stringify({ ownedTanks: ownedTanks, selectedTank: selectedTankId, upgradeLevels: upgradeLevels, ownedWeapons: ownedWeapons, lobbyLoadout: lobbyLoadout, ownedColors: ownedColors, selectedP1Color: selectedP1Color, selectedP2Color: selectedP2Color });
+    var rem = null;
+    try { rem = JSON.parse(localStorage.getItem('rp_remember') || 'null'); } catch(e) {}
+    localStorage.setItem(localProfileKey(loggedInUser), JSON.stringify({
+      username: loggedInUser, hash: (rem && rem.hash) || '', money: money, kills: killCount, xp: xp, shop_data: shopData
+    }));
+  } catch(e) {}
+}
+function loadLocalProfile(user, hash) {
+  try {
+    var snap = JSON.parse(localStorage.getItem(localProfileKey(user)) || 'null');
+    if (!snap || snap.username !== user) return null;
+    if (hash && snap.hash && snap.hash !== hash) return null;
+    return snap;
+  } catch(e) { return null; }
+}
+function offlineAccountLogin(user, hash) {
+  var snap = loadLocalProfile(user, hash);
+  if (!snap) return false;
+  offlineAccount = true;
+  loggedInUser = user; profileId = null; money = snap.money || 0; killCount = snap.kills || 0; xp = snap.xp || 0;
+  if (snap.shop_data) { try { var sd = JSON.parse(snap.shop_data); if (sd.ownedTanks) ownedTanks = sd.ownedTanks; if (sd.ownedWeapons) ownedWeapons = sd.ownedWeapons; if (sd.ownedColors) ownedColors = sd.ownedColors; if (sd.upgradeLevels) upgradeLevels = sd.upgradeLevels; if (sd.selectedTank) selectedTankId = sd.selectedTank; if (sd.selectedP1Color) selectedP1Color = sd.selectedP1Color; if (sd.selectedP2Color) selectedP2Color = sd.selectedP2Color; if (sd.lobbyLoadout) lobbyLoadout = sd.lobbyLoadout; } catch(e) {} }
+  onLogin();
+  return true;
 }
 
 async function saveProfileStats() {
   var s = document.getElementById('lobbyMoneySmall');
   if (s) s.textContent = '$' + money;
-  if (!profileId || !supabaseClient) return;
+  if (loggedInUser) saveLocalProfileSnapshot();
+  if (!profileId || !supabaseClient) { updateLobbyXp(); return; }
   var shopData = JSON.stringify({ ownedTanks: ownedTanks, selectedTank: selectedTankId, upgradeLevels: upgradeLevels, ownedWeapons: ownedWeapons, lobbyLoadout: lobbyLoadout, ownedColors: ownedColors, selectedP1Color: selectedP1Color, selectedP2Color: selectedP2Color });
-  await supabaseClient.from('profiles').update({ money: money, kills: killCount, xp: xp, shop_data: shopData }).eq('id', profileId);
+  try { await supabaseClient.from('profiles').update({ money: money, kills: killCount, xp: xp, shop_data: shopData }).eq('id', profileId); } catch(e) {}
   updateLobbyXp();
 }
 
@@ -4277,7 +4328,7 @@ function getShopData() {
 function saveShopData() {
   try { localStorage.setItem('rp_shop_' + loggedInUser, JSON.stringify({ownedTanks:ownedTanks,selectedTank:selectedTankId,upgradeLevels:upgradeLevels,ownedWeapons:ownedWeapons,lobbyLoadout:lobbyLoadout,xp:xp,money:money,ownedColors:ownedColors,selectedP1Color:selectedP1Color,selectedP2Color:selectedP2Color})); } catch(e) {}
   saveMoney();
-  if (profileId && supabaseClient) saveProfileStats();
+  if (loggedInUser) saveProfileStats();
 }
 
 function showShop() {
