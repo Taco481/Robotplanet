@@ -496,6 +496,7 @@
           <button class="mode-main-btn" onclick="setGameMode('campaign')">Campaign</button>
           <button class="mode-main-btn" onclick="setGameMode('multi')">Multiplayer</button>
         </div>
+        <div id="offlineBadge" style="display:none;align-items:center;gap:4px;color:#888;font-size:9px;letter-spacing:1px">◎ OFFLINE — multiplayer disabled</div>
 
         <div class="lobby-row">
           <input type="text" id="nameInput" value="MechWarrior" maxlength="20" placeholder="Robot name">
@@ -1135,6 +1136,26 @@ function applySavedSettings() {
     if (s.online2p !== undefined) setOnline2p(!!s.online2p);
   } catch(e) {}
 }
+var rpOnline = (typeof navigator !== 'undefined') ? navigator.onLine : true;
+function updateOnlineUI() {
+  var badge = document.getElementById('offlineBadge');
+  if (badge) badge.style.display = rpOnline ? 'none' : 'flex';
+  var btns = document.querySelectorAll('.mode-main-btn');
+  for (var i = 0; i < btns.length; i++) {
+    if (!btns[i] || !btns[i].onclick) continue;
+    var oc = btns[i].getAttribute('onclick') || '';
+    if (oc.indexOf("'multi'") !== -1) {
+      btns[i].style.opacity = rpOnline ? '1' : '0.35';
+      btns[i].style.pointerEvents = rpOnline ? 'auto' : 'none';
+      btns[i].title = rpOnline ? '' : 'Multiplayer not available offline';
+    }
+  }
+  if (!rpOnline && gameMode === 'multi') setGameMode('single');
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', function(){ rpOnline = true; updateOnlineUI(); });
+  window.addEventListener('offline', function(){ rpOnline = false; updateOnlineUI(); });
+}
 var mpChannel, supabaseClient, roomCode, playerId, isHost, mpStateSendCounter = 0;
 var maxPlayers = 100;
 var gameModeType = 'ffa'; // 'ffa', 'teams', 'koth'
@@ -1194,6 +1215,11 @@ function assignPlayerTeams(sorted, teamSize) {
 }
 
 function setGameMode(mode) {
+  if (mode === 'multi' && !rpOnline) {
+    var st = document.getElementById('mpStatus');
+    if (st) { st.style.display = 'block'; st.textContent = 'Multiplayer is not available offline.'; }
+    mode = 'single';
+  }
   gameMode = mode;
   if (mode === 'single') {
     cancelQuickMatch();
@@ -4559,7 +4585,7 @@ function getTankStats() {
   }
   return { hp: hp, speed: speed, shield: shield, dmg: dmg, color: t.color };
 }
-setTimeout(function(){ if (typeof applySavedSettings === 'function') applySavedSettings(); if (typeof tryAutoLogin === 'function') tryAutoLogin(); }, 500);
+setTimeout(function(){ if (typeof applySavedSettings === 'function') applySavedSettings(); if (typeof updateOnlineUI === 'function') updateOnlineUI(); if (typeof tryAutoLogin === 'function') tryAutoLogin(); }, 500);
 setTimeout(function(){ if (typeof updateColorPickers === 'function') updateColorPickers(); }, 800);
 </script>
 </body>
