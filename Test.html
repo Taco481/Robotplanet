@@ -749,7 +749,7 @@
 
     <div class="shop-overlay" id="buildOverlay">
       <h2>🛠 TANK BOUWER</h2>
-      <div style="color:#888;font-size:10px;text-align:center;margin-bottom:6px">Kies blokken in de winkel (per stuk), klik links in het raster om te plaatsen, rechtklik om te verwijderen. Midden = core (vast).</div>
+      <div style="color:#888;font-size:10px;text-align:center;margin-bottom:6px">Kies blokken in de winkel (per stuk), klik links in het raster om te plaatsen, rechtklik om te verwijderen. Geen kanon blok = geen kanon, geen pantser blok = geen pantser.</div>
       <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;justify-content:center">
         <canvas id="buildCanvas" width="250" height="250" style="border-radius:8px;border:2px solid rgba(74,74,255,0.4);background:#0b0b1c;cursor:pointer"></canvas>
         <div id="buildPalette" style="display:flex;flex-direction:column;gap:6px;min-width:170px"></div>
@@ -2053,25 +2053,19 @@ class RobotArena {
   drawBlockBody(s, sway) {
     var cell = Math.max(7, Math.round((s * 1.2) / 5));
     var off = -cell * 2;
+    ctx.fillStyle = this.isPlayer ? 'rgba(38,40,52,0.95)' : 'rgba(48,26,30,0.95)';
+    ctx.beginPath(); ctx.roundRect(off - 3, off - 3 + sway, cell * 5 + 6, cell * 5 + 6, 7); ctx.fill();
+    var bodyCol = this.isPlayer ? shadeColor(this.color, -0.15) : shadeColor('#cc3333', -0.15);
     for (var r = 0; r < 5; r++) {
       for (var c = 0; c < 5; c++) {
         var val = this.buildGrid[r * 5 + c];
         if (!val) continue;
         var x = off + c * cell;
         var y = off + r * cell + sway;
-        var col;
-        if (val === 'core') col = shadeColor(this.color, 0.2);
-        else if (val === 'armor') col = shadeColor(this.color, -0.1);
-        else if (val === 'wheel') col = '#5d5d6b';
-        else if (val === 'cannon') col = shadeColor(this.color, -0.35);
-        else if (val === 'energy') col = '#66ddff';
-        ctx.fillStyle = col;
-        ctx.beginPath(); ctx.roundRect(x + 1, y + 1, cell - 2, cell - 2, 3);
-        ctx.fill();
-        ctx.strokeStyle = "rgba(0,0,0,0.25)";
-        ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.roundRect(x + 1, y + 1, cell - 2, cell - 2, 3);
-        ctx.stroke();
+        var dy = 0, dx = 0;
+        var di = Math.hypot(c - 2, r - 2);
+        if (di > 0) { dx = (c - 2) / di; dy = (r - 2) / di; }
+        drawPartIcon(ctx, val, x, y, cell, bodyCol, [dx, dy]);
       }
     }
   }
@@ -2244,6 +2238,7 @@ function startGameMP() {
   player.diffDmgMult = ts.dmg;
   player.w = ts.w;
   player.buildGrid = buildGrid;
+  player.canFire = ts.counts.cannon > 0;
   selectedAbility = pickAbility(buildGrid);
   player.team = myTeam;
   player.color = teamColors[myTeam % teamColors.length];
@@ -2284,6 +2279,7 @@ function startGameMP() {
     player2.diffDmgMult = ts2.dmg;
     player2.w = ts2.w;
     player2.buildGrid = buildGrid2;
+    player2.canFire = ts2.counts.cannon > 0;
     player2.team = playerTeams[playerId2] || myTeam;
     player2.color = (loggedInUser && ownedColors.indexOf(selectedP2Color) !== -1) ? selectedP2Color : '#ff8844';
   }
@@ -2371,6 +2367,7 @@ function startCampaign() {
   player.diffDmgMult = ts.dmg;
   player.w = ts.w;
   player.buildGrid = buildGrid;
+  player.canFire = ts.counts.cannon > 0;
   selectedAbility = pickAbility(buildGrid);
   player.color = (ownedColors.indexOf(selectedP1Color) !== -1) ? selectedP1Color : ts.color;
 
@@ -2484,6 +2481,7 @@ function startGame() {
   player.diffDmgMult = ts.dmg;
   player.w = ts.w;
   player.buildGrid = buildGrid;
+  player.canFire = ts.counts.cannon > 0;
   selectedAbility = pickAbility(buildGrid);
   player.color = (ownedColors.indexOf(selectedP1Color) !== -1) ? selectedP1Color : ts.color;
   enemies = [];
@@ -2527,6 +2525,7 @@ function startGame() {
     player2.diffDmgMult = ts2.dmg;
     player2.w = ts2.w;
     player2.buildGrid = buildGrid2;
+    player2.canFire = ts2.counts.cannon > 0;
     player2.color = (ownedColors.indexOf(selectedP2Color) !== -1) ? selectedP2Color : '#ff8844';
     player2.tankId = 'default';
     document.getElementById('player2HpRow').style.display = 'flex';
@@ -2742,6 +2741,7 @@ function player2ShootAuto() {
 // Fire button auto-fire in game loop
 
 function firePlayerAt(wx, wy) {
+  if (player && player.canFire === false) return;
   var loadout = (loggedInUser && ownedWeapons.length > 5) ? lobbyLoadout : [0,1,2,3,4];
   var w = weapons[loadout[selectedWeapon]] || weapons[0];
   if (w.special === "defend") {
@@ -2769,6 +2769,7 @@ function playerShoot() {
 }
 
 function player2Shoot() {
+  if (player2 && player2.canFire === false) return;
   var loadout = [0,1,2,3,4];
   var w = weapons[loadout[selectedWeapon2]] || weapons[2];
   if (w.special === "defend") {
@@ -3877,7 +3878,7 @@ async function registerAccount() {
   ownedWeapons = [0,1,2,3,4]; lobbyLoadout = [0,1,2,3,4];
   ownedColors = ['#88ccff']; selectedP1Color = '#88ccff'; selectedP2Color = '#ff8844';
   partMerge(null);
-  buildGrid = emptyGrid(); buildGrid2 = emptyGrid();
+  buildGrid = defaultBuild(); buildGrid2 = defaultBuild();
   try { localStorage.removeItem('rp_shop_' + user); } catch(e) {}
   try { localStorage.removeItem('rp_remember'); } catch(e) {}
   try { localStorage.removeItem('rp_money'); } catch(e) {}
@@ -3961,7 +3962,7 @@ async function resetAccount() {
   ownedWeapons = [0,1,2,3,4]; lobbyLoadout = [0,1,2,3,4];
   ownedColors = ['#88ccff']; selectedP1Color = '#88ccff'; selectedP2Color = '#ff8844';
   partMerge(null);
-  buildGrid = emptyGrid(); buildGrid2 = emptyGrid();
+  buildGrid = defaultBuild(); buildGrid2 = defaultBuild();
   shopTab = 'parts';
   var ai = document.getElementById('accountInfo');
   var ab = document.getElementById('accountBtns');
@@ -4395,11 +4396,16 @@ var ownedParts = { armor:4, wheel:3, cannon:1, energy:0 };
 function emptyGrid() {
   var g = [];
   for (var i = 0; i < 25; i++) g.push('');
-  g[12] = 'core';
   return g;
 }
-var buildGrid = emptyGrid();
-var buildGrid2 = emptyGrid();
+function defaultBuild() {
+  var g = emptyGrid();
+  g[5]='armor'; g[6]='armor'; g[7]='cannon'; g[8]='armor'; g[9]='armor';
+  g[10]='wheel'; g[12]='wheel'; g[14]='wheel';
+  return g;
+}
+var buildGrid = defaultBuild();
+var buildGrid2 = defaultBuild();
 var buildSlot = 1;
 var buildPalettePart = 'armor';
 var buildPendingMode = 'single';
@@ -4411,7 +4417,6 @@ function normGrid(g) {
     var v = g[i];
     out[i] = (v === 'armor' || v === 'wheel' || v === 'cannon' || v === 'energy') ? v : '';
   }
-  out[12] = 'core';
   return out;
 }
 function partMerge(parts) {
@@ -4441,8 +4446,8 @@ function applyPartlyData(sd) {
   if (!sd) return;
   if (sd.parts && typeof sd.parts === 'object') partMerge(sd.parts);
   else partMerge(null);
-  if (sd.build) buildGrid = normGrid(sd.build); else buildGrid = emptyGrid();
-  if (sd.build2) buildGrid2 = normGrid(sd.build2); else buildGrid2 = emptyGrid();
+  if (sd.build) buildGrid = normGrid(sd.build); else buildGrid = defaultBuild();
+  if (sd.build2) buildGrid2 = normGrid(sd.build2); else buildGrid2 = defaultBuild();
 }
 function countParts(grid) {
   var c = { armor:0, wheel:0, cannon:0, energy:0, dmg:0, total:0, armorHp:0, wheelSpeed:0, cannonDmg:0, shieldEn:0 };
@@ -4468,7 +4473,7 @@ function countParts(grid) {
 }
 function computeBuildStats(grid) {
   var c = countParts(grid || buildGrid);
-  var hp = 80 + c.armorHp + 6 * c.total;
+  var hp = 20 + c.armorHp;
   var shield = c.shieldEn;
   var dmg = 1 + c.cannonDmg;
   var speed = c.total === 0 ? 0.55 : Math.min(1.6, Math.max(0.5, 0.55 + 0.13 * c.wheel - 0.015 * c.total));
@@ -4686,10 +4691,6 @@ function buildRenderPalette() {
     html += '<div style="color:#888;font-size:9px">$' + p.cost + '</div></div>';
     html += '</div>';
   }
-  html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);opacity:0.8">';
-  html += '<span style="width:18px;height:18px;border-radius:3px;background:#5a6a7a;border:1px solid rgba(255,255,255,0.3)"></span>';
-  html += '<div style="color:#ddd;font-size:11px;font-weight:bold">Core (vast)</div>';
-  html += '</div>';
   el.innerHTML = html;
 }
 function buildSelectPart(id) {
@@ -4712,13 +4713,12 @@ function buildCanvasClick(ev) {
   var remove = ev.button === 2;
   if (remove) {
     var v = grid[idx];
-    if (v && v !== 'core') {
+    if (v) {
       grid[idx] = '';
       ownedParts[v] = (ownedParts[v] || 0) + 1;
       buildRenderAll();
     }
   } else {
-    if (grid[idx] === 'core') return;
     if (grid[idx]) {
       var old = grid[idx];
       grid[idx] = '';
@@ -4740,31 +4740,90 @@ function buildDrawCanvas() {
   var cell = 50;
   var grid = builderGrid();
   ctxb.clearRect(0, 0, 250, 250);
+  ctxb.fillStyle = '#10101f';
+  ctxb.fillRect(0, 0, 250, 250);
+  ctxb.strokeStyle = 'rgba(255,255,255,0.07)';
+  ctxb.lineWidth = 1;
+  for (var g = 0; g <= 5; g++) {
+    ctxb.beginPath(); ctxb.moveTo(g * cell + 0.5, 0); ctxb.lineTo(g * cell + 0.5, 250); ctxb.stroke();
+    ctxb.beginPath(); ctxb.moveTo(0, g * cell + 0.5); ctxb.lineTo(250, g * cell + 0.5); ctxb.stroke();
+  }
   for (var r = 0; r < 5; r++) {
     for (var c = 0; c < 5; c++) {
-      var idx = r * 5 + c;
-      var val = grid[idx];
-      var col = '#151530';
-      if (val === 'core') col = '#5a6a7a';
-      else if (val === 'armor') col = '#7a9cc6';
-      else if (val === 'wheel') col = '#5d5d6b';
-      else if (val === 'cannon') col = '#c94f4f';
-      else if (val === 'energy') col = '#5fd7f2';
-      ctxb.fillStyle = col;
-      ctxb.fillRect(c * cell + 1, r * cell + 1, cell - 2, cell - 2);
-      ctxb.strokeStyle = 'rgba(255,255,255,0.08)';
-      ctxb.strokeRect(c * cell + 0.5, r * cell + 0.5, cell - 1, cell - 1);
-      if (val) {
-        ctxb.strokeStyle = 'rgba(0,0,0,0.3)';
-        ctxb.strokeRect(c * cell + 1.5, r * cell + 1.5, cell - 3, cell - 3);
-      }
+      var val = grid[r * 5 + c];
+      if (!val) continue;
+      drawPartIcon(ctxb, val, c * cell, r * cell, cell, null, null);
     }
+  }
+}
+function drawPartIcon(bctx, val, x, y, cs, bodyColor, dir) {
+  var cx = x + cs / 2, cy = y + cs / 2;
+  var pad = 1;
+  if (val === 'armor') {
+    var col = bodyColor || '#7a9cc6';
+    bctx.fillStyle = col;
+    bctx.beginPath(); bctx.roundRect(x + pad, y + pad, cs - pad * 2, cs - pad * 2, 3); bctx.fill();
+    bctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    bctx.lineWidth = 1;
+    bctx.beginPath(); bctx.roundRect(x + pad, y + pad, cs - pad * 2, cs - pad * 2, 3); bctx.stroke();
+    bctx.fillStyle = 'rgba(255,255,255,0.18)';
+    bctx.beginPath(); bctx.roundRect(x + pad + 1, y + pad + 1, cs - pad * 2 - 2, (cs - pad * 2) * 0.36, 2); bctx.fill();
+    bctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    bctx.beginPath(); bctx.moveTo(x + 3, y + cs - 3); bctx.lineTo(x + cs - 3, y + 3); bctx.stroke();
+    bctx.fillStyle = 'rgba(0,0,0,0.4)';
+    var rv = Math.max(2, cs * 0.09);
+    bctx.fillRect(x + 2, y + 2, rv, rv);
+    bctx.fillRect(x + cs - 2 - rv, y + 2, rv, rv);
+    bctx.fillRect(x + 2, y + cs - 2 - rv, rv, rv);
+    bctx.fillRect(x + cs - 2 - rv, y + cs - 2 - rv, rv, rv);
+  } else if (val === 'wheel') {
+    bctx.fillStyle = '#23232c';
+    bctx.beginPath(); bctx.arc(cx, cy, cs * 0.44, 0, Math.PI * 2); bctx.fill();
+    bctx.fillStyle = '#3c3c48';
+    bctx.beginPath(); bctx.arc(cx, cy, cs * 0.3, 0, Math.PI * 2); bctx.fill();
+    bctx.strokeStyle = '#b9b9c4';
+    bctx.lineWidth = Math.max(1, cs * 0.08);
+    bctx.beginPath(); bctx.arc(cx, cy, cs * 0.3, 0, Math.PI * 2); bctx.stroke();
+    bctx.fillStyle = '#9a9aa8';
+    bctx.beginPath(); bctx.arc(cx, cy, cs * 0.1, 0, Math.PI * 2); bctx.fill();
+  } else if (val === 'cannon') {
+    bctx.fillStyle = '#2a2a34';
+    bctx.beginPath(); bctx.roundRect(x + pad, y + pad, cs - pad * 2, cs - pad * 2, 3); bctx.fill();
+    bctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    bctx.lineWidth = 1;
+    bctx.beginPath(); bctx.roundRect(x + pad, y + pad, cs - pad * 2, cs - pad * 2, 3); bctx.stroke();
+    var dx = 1, dy = 0;
+    if (dir && (dir[0] !== 0 || dir[1] !== 0)) { dx = dir[0]; dy = dir[1]; }
+    var tr = cs * 0.2;
+    bctx.strokeStyle = '#14141c';
+    bctx.lineCap = 'round';
+    bctx.lineWidth = Math.max(2.5, cs * 0.2);
+    bctx.beginPath();
+    bctx.moveTo(cx - dx * tr, cy - dy * tr);
+    bctx.lineTo(cx + dx * tr, cy + dy * tr);
+    bctx.stroke();
+  } else if (val === 'energy') {
+    bctx.fillStyle = '#103a4a';
+    bctx.beginPath(); bctx.roundRect(x + pad, y + pad, cs - pad * 2, cs - pad * 2, 3); bctx.fill();
+    bctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    bctx.lineWidth = 1;
+    bctx.beginPath(); bctx.roundRect(x + pad, y + pad, cs - pad * 2, cs - pad * 2, 3); bctx.stroke();
+    bctx.shadowColor = '#8eeaff';
+    bctx.shadowBlur = cs * 0.3;
+    bctx.fillStyle = '#aef4ff';
+    bctx.beginPath(); bctx.arc(cx, cy, cs * 0.24, 0, Math.PI * 2); bctx.fill();
+    bctx.shadowBlur = 0;
+    bctx.strokeStyle = 'rgba(142,234,255,0.5)';
+    bctx.beginPath(); bctx.arc(cx, cy, cs * 0.4, 0, Math.PI * 2); bctx.stroke();
   }
 }
 function buildRenderStats() {
   var el = document.getElementById('buildStats');
   var st = computeBuildStats(builderGrid());
   var ab = tankAbilities[pickAbility(builderGrid())];
+  var warn = '';
+  if (st.counts.cannon === 0) warn += '<div style="color:#ff6644;font-size:10px;margin-top:4px">⚠ GEEN KANON — kan niet schieten!</div>';
+  if (st.counts.armor === 0 && st.counts.total === 0) warn += '<div style="color:#ff6644;font-size:10px">⚠ GEEN PANTSER — bijna geen HP!</div>';
   el.innerHTML =
     '<div style="font-weight:bold;margin-bottom:4px">'+ (buildSlot === 2 ? 'P2 TANK' : 'JOUW TANK') + '</div>' +
     '<div>❤️ HP: <b style="color:#ff8888">' + st.hp + '</b></div>' +
@@ -4772,8 +4831,9 @@ function buildRenderStats() {
     '<div>💥 Schade: <b style="color:#ffcc66">x' + st.dmg + '</b></div>' +
     '<div>🏎 Snelheid: <b style="color:#88ff88">' + Math.round(st.speed * 100) + '%</b></div>' +
     '<div>📐 Grootte: <b style="color:#ccb">' + st.w + 'px</b></div>' +
-    '<div>Blokken: <b>' + st.counts.total + '</b></div>' +
-    '<div style="margin-top:6px;font-size:10px;color:#aab">Ability: <b style="color:' + (ab ? '#ffdd44' : '#888') + '">' + (ab ? ab.name : '-') + '</b></div>';
+    '<div>Blokken: <b>' + st.counts.total + '</b> (' + st.counts.armor + ' pantser, ' + st.counts.wheel + ' wiel, ' + st.counts.cannon + ' kanon, ' + st.counts.energy + ' energie)</div>' +
+    '<div style="margin-top:6px;font-size:10px;color:#aab">Ability: <b style="color:' + (ab ? '#ffdd44' : '#888') + '">' + (ab ? ab.name : '-') + '</b></div>' +
+    warn;
 }
 function builderReady() {
   builderGrid();
@@ -4961,7 +5021,7 @@ function getTankStats(p2) {
       else if (u.id === 'damage') dmg += u.bonus[k];
     }
   }
-  return { hp: Math.round(hp), speed: Math.round(speed * 100) / 100, shield: shield, dmg: dmg, w: st.w, grid: grid, color: '#88ccff' };
+  return { hp: Math.round(hp), speed: Math.round(speed * 100) / 100, shield: shield, dmg: dmg, w: st.w, grid: grid, counts: st.counts, color: '#88ccff' };
 }
 setTimeout(function(){ if (typeof applySavedSettings === 'function') applySavedSettings(); if (typeof updateOnlineUI === 'function') updateOnlineUI(); if (typeof tryAutoLogin === 'function') tryAutoLogin(); }, 500);
 setTimeout(function(){ if (typeof updateColorPickers === 'function') updateColorPickers(); }, 800);
