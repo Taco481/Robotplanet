@@ -2053,8 +2053,6 @@ class RobotArena {
   drawBlockBody(s, sway) {
     var cell = Math.max(7, Math.round((s * 1.2) / 5));
     var off = -cell * 2;
-    ctx.fillStyle = this.isPlayer ? 'rgba(38,40,52,0.95)' : 'rgba(48,26,30,0.95)';
-    ctx.beginPath(); ctx.roundRect(off - 3, off - 3 + sway, cell * 5 + 6, cell * 5 + 6, 7); ctx.fill();
     var bodyCol = this.isPlayer ? shadeColor(this.color, -0.15) : shadeColor('#cc3333', -0.15);
     for (var r = 0; r < 5; r++) {
       for (var c = 0; c < 5; c++) {
@@ -2062,10 +2060,7 @@ class RobotArena {
         if (!val) continue;
         var x = off + c * cell;
         var y = off + r * cell + sway;
-        var dy = 0, dx = 0;
-        var di = Math.hypot(c - 2, r - 2);
-        if (di > 0) { dx = (c - 2) / di; dy = (r - 2) / di; }
-        drawPartIcon(ctx, val, x, y, cell, bodyCol, [dx, dy]);
+        drawPartIcon(ctx, val, x, y, cell, bodyCol, partDir(this.buildGrid, r, c));
       }
     }
   }
@@ -2238,7 +2233,7 @@ function startGameMP() {
   player.diffDmgMult = ts.dmg;
   player.w = ts.w;
   player.buildGrid = buildGrid;
-  player.canFire = ts.counts.cannon > 0;
+  player.canFire = ts.counts.shots > 0;
   selectedAbility = pickAbility(buildGrid);
   player.team = myTeam;
   player.color = teamColors[myTeam % teamColors.length];
@@ -2279,7 +2274,7 @@ function startGameMP() {
     player2.diffDmgMult = ts2.dmg;
     player2.w = ts2.w;
     player2.buildGrid = buildGrid2;
-    player2.canFire = ts2.counts.cannon > 0;
+    player2.canFire = ts2.counts.shots > 0;
     player2.team = playerTeams[playerId2] || myTeam;
     player2.color = (loggedInUser && ownedColors.indexOf(selectedP2Color) !== -1) ? selectedP2Color : '#ff8844';
   }
@@ -2367,7 +2362,7 @@ function startCampaign() {
   player.diffDmgMult = ts.dmg;
   player.w = ts.w;
   player.buildGrid = buildGrid;
-  player.canFire = ts.counts.cannon > 0;
+  player.canFire = ts.counts.shots > 0;
   selectedAbility = pickAbility(buildGrid);
   player.color = (ownedColors.indexOf(selectedP1Color) !== -1) ? selectedP1Color : ts.color;
 
@@ -2481,7 +2476,7 @@ function startGame() {
   player.diffDmgMult = ts.dmg;
   player.w = ts.w;
   player.buildGrid = buildGrid;
-  player.canFire = ts.counts.cannon > 0;
+  player.canFire = ts.counts.shots > 0;
   selectedAbility = pickAbility(buildGrid);
   player.color = (ownedColors.indexOf(selectedP1Color) !== -1) ? selectedP1Color : ts.color;
   enemies = [];
@@ -2525,7 +2520,7 @@ function startGame() {
     player2.diffDmgMult = ts2.dmg;
     player2.w = ts2.w;
     player2.buildGrid = buildGrid2;
-    player2.canFire = ts2.counts.cannon > 0;
+    player2.canFire = ts2.counts.shots > 0;
     player2.color = (ownedColors.indexOf(selectedP2Color) !== -1) ? selectedP2Color : '#ff8844';
     player2.tankId = 'default';
     document.getElementById('player2HpRow').style.display = 'flex';
@@ -4386,13 +4381,15 @@ var tankColors = [
 var ownedTanks = ['default'];
 var selectedTankId = 'default';
 var partDefs = [
-  { id:'armor',  name:'Armor Block',  color:'#7a9cc6', hp:60,   cost:400, desc:'+60 HP per block, gewicht' },
-  { id:'wheel',  name:'Wheel Block',  color:'#6b6b7a', speed:0.13, cost:500, desc:'+snelheid per block, gewicht' },
-  { id:'cannon', name:'Cannon Block', color:'#c94f4f', dmg:0.15, cost:800, desc:'+15% schade per block' },
-  { id:'energy', name:'Energy Block', color:'#5fd7f2', shield:30, cost:600, desc:'+30 schild per block' },
+  { id:'armor',  name:'Pantser', color:'#7a9cc6', hp:60, cost:400, desc:'+60 HP per blok | gewicht' },
+  { id:'wheel',  name:'Wiel', color:'#6b6b7a', speed:0.13, cost:500, desc:'+13% snelheid per blok | gewicht' },
+  { id:'energy', name:'Energie cel', color:'#5fd7f2', shield:30, cost:600, desc:'+30 schild per blok' },
+  { id:'cannon', name:'Kanon koepel', color:'#c9c3a8', cost:800, desc:'Grote koepel (1 vak) — schiet alleen als er een Loop direct naast staat' },
+  { id:'loop', name:'Loop', color:'#2a2a34', cost:500, desc:'Kanontoren (1 vak) — geeft +1 schot naast een koepel' },
+  { id:'cannonS', name:'Klein kanon', color:'#8a8a96', cost:650, desc:'Kleine koepel + loop in 1 vak — werkt los' },
 ];
-var starterParts = { armor:4, wheel:3, cannon:1, energy:0 };
-var ownedParts = { armor:4, wheel:3, cannon:1, energy:0 };
+var starterParts = { armor:4, wheel:3, cannon:1, loop:1, energy:0, cannonS:0 };
+var ownedParts = { armor:4, wheel:3, cannon:1, loop:1, energy:0, cannonS:0 };
 function emptyGrid() {
   var g = [];
   for (var i = 0; i < 25; i++) g.push('');
@@ -4400,8 +4397,8 @@ function emptyGrid() {
 }
 function defaultBuild() {
   var g = emptyGrid();
-  g[5]='armor'; g[6]='armor'; g[7]='cannon'; g[8]='armor'; g[9]='armor';
-  g[10]='wheel'; g[12]='wheel'; g[14]='wheel';
+  g[5]='armor'; g[6]='armor'; g[7]='armor'; g[8]='cannon'; g[9]='loop';
+  g[10]='wheel'; g[12]='wheel'; g[14]='wheel'; g[15]='armor';
   return g;
 }
 var buildGrid = defaultBuild();
@@ -4415,14 +4412,15 @@ function normGrid(g) {
   if (!g || !g.length) return out;
   for (var i = 0; i < 25; i++) {
     var v = g[i];
-    out[i] = (v === 'armor' || v === 'wheel' || v === 'cannon' || v === 'energy') ? v : '';
+    out[i] = (v === 'armor' || v === 'wheel' || v === 'cannon' || v === 'loop' || v === 'cannonS' || v === 'energy') ? v : '';
   }
   return out;
 }
 function partMerge(parts) {
-  ownedParts = { armor: starterParts.armor, wheel: starterParts.wheel, cannon: starterParts.cannon, energy: starterParts.energy };
-  if (parts) {
-    for (var k in ownedParts) if (typeof parts[k] === 'number' && parts[k] >= 0) ownedParts[k] = parts[k];
+  ownedParts = {};
+  for (var pk in starterParts) ownedParts[pk] = starterParts[pk];
+  if (parts && typeof parts === 'object') {
+    for (var k in starterParts) if (typeof parts[k] === 'number' && parts[k] >= 0) ownedParts[k] = parts[k];
   }
 }
 function migrateUpgrades() {
@@ -4471,11 +4469,43 @@ function countParts(grid) {
   }
   return c;
 }
+function countShots(grid) {
+  var g = grid || buildGrid;
+  var shots = 0;
+  for (var i = 0; i < 25; i++) {
+    if (g[i] !== 'loop') continue;
+    var r = Math.floor(i / 5), cc = i % 5;
+    if (r > 0 && g[i - 5] === 'cannon') shots++;
+    else if (r < 4 && g[i + 5] === 'cannon') shots++;
+    else if (cc > 0 && g[i - 1] === 'cannon') shots++;
+    else if (cc < 4 && g[i + 1] === 'cannon') shots++;
+  }
+  shots += (countParts(g).cannonS || 0);
+  return shots;
+}
+function partDir(grid, r, c) {
+  var g = grid || buildGrid;
+  for (var rr = Math.max(0, r - 1); rr <= Math.min(4, r + 1); rr++) {
+    for (var cc = Math.max(0, c - 1); cc <= Math.min(4, c + 1); cc++) {
+      if (rr === r && cc === c) continue;
+      if (Math.abs(rr - r) + Math.abs(cc - c) !== 1) continue;
+      if (g[rr * 5 + cc] === 'cannon') {
+        var dx = c - cc, dy = r - rr;
+        var dl = Math.hypot(dx, dy) || 1;
+        return [dx / dl, dy / dl];
+      }
+    }
+  }
+  var mx = c - 2, my = r - 2, md = Math.hypot(mx, my) || 1;
+  return [mx / md, my / md];
+}
 function computeBuildStats(grid) {
   var c = countParts(grid || buildGrid);
+  var shots = countShots(grid || buildGrid);
+  c.shots = shots;
   var hp = 20 + c.armorHp;
   var shield = c.shieldEn;
-  var dmg = 1 + c.cannonDmg;
+  var dmg = 1 + 0.15 * shots;
   var speed = 0;
   if (c.wheel > 0) speed = Math.min(1.6, Math.max(0.5, 0.55 + 0.13 * c.wheel - 0.015 * c.total));
   var w = Math.min(64, Math.round(34 + c.total * 1.3));
@@ -4484,7 +4514,7 @@ function computeBuildStats(grid) {
 function pickAbility(grid) {
   var c = countParts(grid || buildGrid);
   if (c.wheel >= 2) return 'light';
-  if (c.cannon >= 1) return 'sniper';
+  if (countShots(grid || buildGrid) > 0) return 'sniper';
   if (c.energy >= 1) return 'shield';
   return 'default';
 }
@@ -4553,8 +4583,10 @@ function renderShopParts() {
     var stat = '';
     if (p.hp) stat = '+60 HP | gewicht';
     else if (p.speed) stat = '+13% snelheid | gewicht';
-    else if (p.dmg) stat = '+15% schade';
     else if (p.shield) stat = '+30 schild';
+    else if (p.id === 'cannon') stat = 'schiet alleen met Loop ernaast';
+    else if (p.id === 'loop') stat = '+1 schot naast een koepel';
+    else if (p.id === 'cannonS') stat = '+1 schot, los werkend';
     html += '<div class="shop-item">';
     html += '<div style="flex:1;min-width:0">';
     html += '<div class="si-name"><span style="display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:middle;margin-right:6px;background:' + p.color + ';border:1px solid rgba(255,255,255,0.3)"></span>' + p.name + '</div>';
@@ -4757,9 +4789,35 @@ function buildDrawCanvas() {
     for (var c = 0; c < 5; c++) {
       var val = grid[r * 5 + c];
       if (!val) continue;
-      drawPartIcon(ctxb, val, c * cell, r * cell, cell, null, null);
+      drawPartIcon(ctxb, val, c * cell, r * cell, cell, null, partDir(grid, r, c));
     }
   }
+}
+function drawBarrel(bctx, cx, cy, dir, half, tw, mw) {
+  var dx = 1, dy = 0;
+  if (dir && (dir[0] !== 0 || dir[1] !== 0)) { dx = dir[0]; dy = dir[1]; }
+  var ang = Math.atan2(dy, dx);
+  bctx.strokeStyle = '#2c2c36';
+  bctx.lineCap = 'round';
+  bctx.lineWidth = tw * 2;
+  bctx.beginPath();
+  bctx.moveTo(cx - dx * half, cy - dy * half);
+  bctx.lineTo(cx + dx * half, cy + dy * half);
+  bctx.stroke();
+  var px = cx + dx * (half + 2), py = cy + dy * (half + 2);
+  bctx.save();
+  bctx.translate(px, py);
+  bctx.rotate(ang);
+  bctx.fillStyle = '#14141c';
+  bctx.fillRect(0, -mw * 2, mw * 1.6, mw * 4);
+  bctx.restore();
+  bctx.save();
+  bctx.translate(cx - dx * half, cy - dy * half);
+  bctx.rotate(ang);
+  bctx.fillStyle = '#46464f';
+  bctx.fillRect(-mw * 0.6, -tw * 1.5, mw * 1.2, tw);
+  bctx.fillRect(-mw * 0.6, tw * 0.5, mw * 1.2, tw);
+  bctx.restore();
 }
 function drawPartIcon(bctx, val, x, y, cs, bodyColor, dir) {
   var cx = x + cs / 2, cy = y + cs / 2;
@@ -4792,21 +4850,32 @@ function drawPartIcon(bctx, val, x, y, cs, bodyColor, dir) {
     bctx.fillStyle = '#9a9aa8';
     bctx.beginPath(); bctx.arc(cx, cy, cs * 0.1, 0, Math.PI * 2); bctx.fill();
   } else if (val === 'cannon') {
-    bctx.fillStyle = '#2a2a34';
-    bctx.beginPath(); bctx.roundRect(x + pad, y + pad, cs - pad * 2, cs - pad * 2, 3); bctx.fill();
-    bctx.strokeStyle = 'rgba(255,255,255,0.12)';
-    bctx.lineWidth = 1;
-    bctx.beginPath(); bctx.roundRect(x + pad, y + pad, cs - pad * 2, cs - pad * 2, 3); bctx.stroke();
-    var dx = 1, dy = 0;
-    if (dir && (dir[0] !== 0 || dir[1] !== 0)) { dx = dir[0]; dy = dir[1]; }
-    var tr = cs * 0.2;
-    bctx.strokeStyle = '#14141c';
-    bctx.lineCap = 'round';
-    bctx.lineWidth = Math.max(2.5, cs * 0.2);
-    bctx.beginPath();
-    bctx.moveTo(cx - dx * tr, cy - dy * tr);
-    bctx.lineTo(cx + dx * tr, cy + dy * tr);
-    bctx.stroke();
+    bctx.fillStyle = 'rgba(20,22,30,0.9)';
+    bctx.beginPath(); bctx.ellipse(cx, cy + cs * 0.30, cs * 0.46, cs * 0.16, 0, 0, Math.PI * 2); bctx.fill();
+    var grad = bctx.createRadialGradient(cx - cs * 0.18, cy - cs * 0.24, cs * 0.05, cx, cy, cs * 0.5);
+    grad.addColorStop(0, '#eae6da');
+    grad.addColorStop(0.55, '#b4afa0');
+    grad.addColorStop(1, '#6a665a');
+    bctx.fillStyle = grad;
+    bctx.beginPath(); bctx.arc(cx, cy - cs * 0.10, cs * 0.42, Math.PI, Math.PI * 2); bctx.fill();
+    bctx.fillStyle = '#3a382f';
+    bctx.beginPath(); bctx.ellipse(cx, cy - cs * 0.20, cs * 0.20, cs * 0.12, 0, 0, Math.PI * 2); bctx.fill();
+    bctx.fillStyle = '#14141c';
+    bctx.beginPath(); bctx.roundRect(cx - cs * 0.05, cy - cs * 0.34, cs * 0.10, cs * 0.30, 2); bctx.fill();
+  } else if (val === 'loop') {
+    drawBarrel(bctx, cx, cy, dir, cs * 0.46, cs * 0.22, cs * 0.13);
+  } else if (val === 'cannonS') {
+    var ddx = dir && (dir[0] !== 0 || dir[1] !== 0) ? dir[0] : 1;
+    var ddy = dir && (dir[0] !== 0 || dir[1] !== 0) ? dir[1] : 0;
+    bctx.fillStyle = 'rgba(20,22,30,0.9)';
+    bctx.beginPath(); bctx.ellipse(cx - ddx * cs * 0.06, cy - ddy * cs * 0.06 + cs * 0.20, cs * 0.26, cs * 0.10, 0, 0, Math.PI * 2); bctx.fill();
+    var g2 = bctx.createRadialGradient(cx - ddx * cs * 0.12, cy - ddy * cs * 0.12 - cs * 0.12, cs * 0.03, cx, cy, cs * 0.26);
+    g2.addColorStop(0, '#e0dccf');
+    g2.addColorStop(0.6, '#a8a396');
+    g2.addColorStop(1, '#5c584e');
+    bctx.fillStyle = g2;
+    bctx.beginPath(); bctx.arc(cx - ddx * cs * 0.10, cy - ddy * cs * 0.10 - cs * 0.04, cs * 0.22, Math.PI, Math.PI * 2); bctx.fill();
+    drawBarrel(bctx, cx + ddx * cs * 0.04, cy + ddy * cs * 0.04, dir, cs * 0.36, cs * 0.11, cs * 0.07);
   } else if (val === 'energy') {
     bctx.fillStyle = '#103a4a';
     bctx.beginPath(); bctx.roundRect(x + pad, y + pad, cs - pad * 2, cs - pad * 2, 3); bctx.fill();
@@ -4827,7 +4896,7 @@ function buildRenderStats() {
   var st = computeBuildStats(builderGrid());
   var ab = tankAbilities[pickAbility(builderGrid())];
   var warn = '';
-  if (st.counts.cannon === 0) warn += '<div style="color:#ff6644;font-size:10px;margin-top:4px">⚠ GEEN KANON — kan niet schieten!</div>';
+  if (st.counts.shots === 0) warn += '<div style="color:#ff6644;font-size:10px;margin-top:4px">⚠ GEEN WERKEND KANON — zet een Loop naast een koepel, of gebruik een klein kanon!</div>';
   if (st.counts.wheel === 0) warn += '<div style="color:#ff6644;font-size:10px">⚠ GEEN WIELEN — staat volledig stil!</div>';
   else if (st.counts.armor === 0 && st.counts.total === 0) warn += '<div style="color:#ff6644;font-size:10px">⚠ GEEN PANTSER — bijna geen HP!</div>';
   el.innerHTML =
@@ -4837,7 +4906,8 @@ function buildRenderStats() {
     '<div>💥 Schade: <b style="color:#ffcc66">x' + st.dmg + '</b></div>' +
     '<div>🏎 Snelheid: <b style="color:#88ff88">' + Math.round(st.speed * 100) + '%</b></div>' +
     '<div>📐 Grootte: <b style="color:#ccb">' + st.w + 'px</b></div>' +
-    '<div>Blokken: <b>' + st.counts.total + '</b> (' + st.counts.armor + ' pantser, ' + st.counts.wheel + ' wiel, ' + st.counts.cannon + ' kanon, ' + st.counts.energy + ' energie)</div>' +
+    '<div>Blokken: <b>' + st.counts.total + '</b> (' + st.counts.armor + ' pantser, ' + st.counts.wheel + ' wiel, ' + st.counts.energy + ' energie)</div>' +
+    '<div>Kanon: <b>' + st.counts.shots + ' schot</b> (' + (st.counts.cannon || 0) + ' koepel, ' + (st.counts.loop || 0) + ' loop, ' + (st.counts.cannonS || 0) + ' klein)</div>' +
     '<div style="margin-top:6px;font-size:10px;color:#aab">Ability: <b style="color:' + (ab ? '#ffdd44' : '#888') + '">' + (ab ? ab.name : '-') + '</b></div>' +
     warn;
 }
