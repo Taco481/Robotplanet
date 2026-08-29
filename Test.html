@@ -751,7 +751,7 @@
       <h2>🛠 TANK BOUWER</h2>
       <div style="color:#888;font-size:10px;text-align:center;margin-bottom:6px">Kies blokken in de winkel (per stuk), klik links in het raster om te plaatsen, rechtklik om te verwijderen. Geen kanon blok = geen kanon, geen pantser blok = geen pantser.</div>
       <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;justify-content:center">
-        <canvas id="buildCanvas" width="250" height="250" style="border-radius:8px;border:2px solid rgba(74,74,255,0.4);background:#0b0b1c;cursor:pointer"></canvas>
+        <canvas id="buildCanvas" width="250" height="250" style="width:250px;height:250px;border-radius:8px;border:2px solid rgba(74,74,255,0.4);background:#0b0b1c;cursor:pointer"></canvas>
         <div id="buildPalette" style="display:flex;flex-direction:column;gap:6px;min-width:170px"></div>
         <div id="buildStats" style="color:#ddd;font-size:12px;line-height:1.8;min-width:140px"></div>
       </div>
@@ -4702,10 +4702,14 @@ function buildSelectPart(id) {
   buildRenderAll();
 }
 function buildCanvasClick(ev) {
-  var rect = ev.target.getBoundingClientRect();
-  var x = ev.clientX - rect.left;
-  var y = ev.clientY - rect.top;
-  var cell = 50;
+  var cvs = ev.target;
+  var rect = cvs.getBoundingClientRect();
+  if (!rect) return;
+  var sx = cvs.width / rect.width;
+  var sy = cvs.height / rect.height;
+  var x = (ev.clientX - rect.left) * sx;
+  var y = (ev.clientY - rect.top) * sy;
+  var cell = Math.max(1, cvs.width / 5);
   var r = Math.floor(y / cell);
   var c = Math.floor(x / cell);
   if (r < 0 || r > 4 || c < 0 || c > 4) return;
