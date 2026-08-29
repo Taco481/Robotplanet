@@ -2066,6 +2066,8 @@ class RobotArena {
     ctx.beginPath(); ctx.roundRect(off + 1.5, off - 0.5 + sway, span - 3, span - 3, 6); ctx.stroke();
     ctx.fillStyle = 'rgba(255,255,255,0.05)';
     ctx.beginPath(); ctx.roundRect(off + 2, off + 2 + sway, span - 4, span * 0.28, 6); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.30)';
+    ctx.beginPath(); ctx.ellipse(off + span / 2, off + span + cell * 0.62, span * 0.55, cell * 0.24, 0, 0, Math.PI * 2); ctx.fill();
     for (var r = 0; r < 5; r++) {
       for (var c = 0; c < 5; c++) {
         var val = this.buildGrid[r * 5 + c];
@@ -4857,36 +4859,26 @@ function drawPartIcon(bctx, val, x, y, cs, bodyColor, dir) {
     bctx.fillRect(x + 2, y + cs - 2 - rv, rv, rv);
     bctx.fillRect(x + cs - 2 - rv, y + cs - 2 - rv, rv, rv);
   } else if (val === 'wheel') {
-    bctx.fillStyle = '#20202a';
-    bctx.beginPath(); bctx.arc(cx, cy, cs * 0.44, 0, Math.PI * 2); bctx.fill();
-    bctx.strokeStyle = 'rgba(0,0,0,0.35)';
-    bctx.lineWidth = 1;
-    bctx.beginPath(); bctx.arc(cx, cy, cs * 0.44, 0, Math.PI * 2); bctx.stroke();
-    bctx.strokeStyle = '#67707e';
+    var wy = cy + cs * 0.08;
+    bctx.fillStyle = 'rgba(0,0,0,0.28)';
+    bctx.beginPath(); bctx.ellipse(cx, wy + cs * 0.41, cs * 0.40, cs * 0.07, 0, 0, Math.PI * 2); bctx.fill();
+    bctx.fillStyle = '#1c1c26';
+    bctx.beginPath(); bctx.arc(cx, wy, cs * 0.41, 0, Math.PI * 2); bctx.fill();
+    bctx.strokeStyle = 'rgba(255,255,255,0.10)';
+    bctx.lineWidth = Math.max(1.5, cs * 0.04);
+    bctx.beginPath(); bctx.arc(cx, wy, cs * 0.28, Math.PI * 1.15, Math.PI * 1.65); bctx.stroke();
+    bctx.strokeStyle = '#3a4552';
     bctx.lineWidth = Math.max(1.5, cs * 0.06);
-    bctx.beginPath(); bctx.arc(cx, cy, cs * 0.32, 0, Math.PI * 2); bctx.stroke();
-    for (var ti = 0; ti < 10; ti++) {
-      var ta = ti * Math.PI / 5;
-      bctx.fillStyle = '#39414d';
-      bctx.save();
-      bctx.translate(cx + Math.cos(ta) * cs * 0.38, cy + Math.sin(ta) * cs * 0.38);
-      bctx.rotate(ta);
-      bctx.fillRect(-Math.max(1, cs * 0.05), -Math.max(2, cs * 0.07), Math.max(2, cs * 0.1), Math.max(5, cs * 0.14));
-      bctx.restore();
-    }
+    bctx.beginPath(); bctx.arc(cx, wy, cs * 0.34, Math.PI, Math.PI * 2); bctx.stroke();
     bctx.fillStyle = '#3c3c48';
-    bctx.beginPath(); bctx.arc(cx, cy, cs * 0.26, 0, Math.PI * 2); bctx.fill();
-    bctx.strokeStyle = '#c0c0cc';
-    bctx.lineWidth = Math.max(1, cs * 0.07);
-    bctx.beginPath(); bctx.arc(cx, cy, cs * 0.26, 0, Math.PI * 2); bctx.stroke();
-    bctx.fillStyle = '#c0c0cc';
-    for (var sp = 0; sp < 4; sp++) {
-      var sa = sp * Math.PI / 2 + Math.PI / 4;
-      bctx.fillRect(cx + Math.cos(sa) * cs * 0.17 - cs * 0.05, cy + Math.sin(sa) * cs * 0.17 - cs * 0.03, cs * 0.1, cs * 0.06);
-    }
-    bctx.strokeStyle = '#777780';
+    bctx.beginPath(); bctx.arc(cx, wy, cs * 0.23, 0, Math.PI * 2); bctx.fill();
+    bctx.strokeStyle = '#c8c8d4';
     bctx.lineWidth = Math.max(1, cs * 0.05);
-    bctx.beginPath(); bctx.arc(cx, cy, cs * 0.09, 0, Math.PI * 2); bctx.stroke();
+    bctx.beginPath(); bctx.arc(cx, wy, cs * 0.23, 0, Math.PI * 2); bctx.stroke();
+    bctx.fillStyle = '#d8d8e2';
+    bctx.beginPath(); bctx.arc(cx, wy, cs * 0.07, 0, Math.PI * 2); bctx.fill();
+    bctx.fillStyle = 'rgba(30,30,40,0.9)';
+    bctx.beginPath(); bctx.arc(cx, wy, cs * 0.04, 0, Math.PI * 2); bctx.fill();
   } else if (val === 'cannon') {
     bctx.fillStyle = '#2a2a33';
     bctx.beginPath(); bctx.roundRect(x + 2, y + cs * 0.55, cs - 4, cs * 0.42, 4); bctx.fill();
