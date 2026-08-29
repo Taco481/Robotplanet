@@ -2836,9 +2836,10 @@ function processHits() {
       xp += 5;
       saveShopData();
       if (gameMode !== 'multi' && gameMode !== 'campaign') {
-        money += 100;
+        var reward = [200, 300, 400][difficulty] || 200;
+        money += reward;
         saveMoney();
-        addHitText(target.x, target.y - 30, '+100$', '#ffdd44');
+        addHitText(target.x, target.y - 30, '+' + reward + '$', '#ffdd44');
       }
       updateHP();
       createExplosion(target.x, target.y, "#ff8800", 60, true);
