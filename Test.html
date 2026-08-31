@@ -603,6 +603,7 @@
             <div style="margin:6px 0;border-top:1px solid rgba(74,74,255,0.15)"></div>
             <button class="mp-btn" onclick="createRoom()">📡 New Room</button>
             <span style="color:#5555aa;font-size:11px">— or —</span>
+            <button class="mp-btn" onclick="openBuilder('multi')">🛠 My Tank</button>
             <div class="mp-join-row">
               <input type="text" id="roomCodeInput" placeholder="Room code" maxlength="6">
               <button class="mp-btn" onclick="joinRoom()">Join</button>
@@ -630,7 +631,7 @@
           </div>
         </div>
 
-        <button class="lobby-btn" onclick="startGame()" id="startBtn">⚔ FIGHT</button>
+        <button class="lobby-btn" onclick="startFlow()" id="startBtn">⚔ FIGHT</button>
 
         <div id="lobbyWeaponRow" class="lobby-weapon-row" style="display:none"></div>
 
@@ -736,7 +737,7 @@
       <h2>⚙ SHOP</h2>
       <div class="shop-money" id="shopMoney">$0</div>
   <div class="shop-tabs">
-    <button class="shop-tab active" id="shopTabTanks" onclick="showShopTab('tanks')">Tanks</button>
+    <button class="shop-tab active" id="shopTabParts" onclick="showShopTab('parts')">Parts</button>
     <button class="shop-tab" id="shopTabUpgrades" onclick="showShopTab('upgrades')">Upgrades</button>
     <button class="shop-tab" id="shopTabWeapons" onclick="showShopTab('weapons')">Weapons</button>
     <button class="shop-tab" id="shopTabColors" onclick="showShopTab('colors')">Colors</button>
@@ -744,6 +745,24 @@
   </div>
       <div class="shop-list" id="shopList"></div>
       <button class="shop-close" onclick="hideShop()">Close</button>
+    </div>
+
+    <div class="shop-overlay" id="buildOverlay">
+      <h2>🛠 TANK BOUWER</h2>
+      <div style="color:#888;font-size:10px;text-align:center;margin-bottom:6px">Kies blokken in de winkel (per stuk), klik links in het raster om te plaatsen, rechtklik om te verwijderen. Geen kanon blok = geen kanon, geen pantser blok = geen pantser.</div>
+      <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;justify-content:center">
+        <canvas id="buildCanvas" width="250" height="250" style="width:250px;height:250px;border-radius:8px;border:2px solid rgba(74,74,255,0.4);background:#0b0b1c;cursor:pointer"></canvas>
+        <div id="buildPalette" style="display:flex;flex-direction:column;gap:6px;min-width:170px"></div>
+        <div id="buildStats" style="color:#ddd;font-size:12px;line-height:1.8;min-width:140px"></div>
+      </div>
+      <div id="buildPlayerTabs" style="display:none;margin-top:10px;gap:6px;justify-content:center">
+        <button class="shop-tab" id="buildTabP1" onclick="setBuildSlot(1)">P1</button>
+        <button class="shop-tab" id="buildTabP2" onclick="setBuildSlot(2)">P2</button>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px;justify-content:center">
+        <button class="shop-close" onclick="closeBuilder()">✕ Terug</button>
+        <button class="shop-close" id="builderReadyBtn" style="background:linear-gradient(135deg,#44aa44,#228822)" onclick="builderReady()">✓ START GEVECHT</button>
+      </div>
     </div>
   </div>
 
@@ -1944,25 +1963,29 @@ class RobotArena {
       ctx.fillRect(-s/2 - 1, ty, 4, 5);
       ctx.fillRect(s/2 - 3, ty, 4, 5);
     }
-    var bodyGrad = ctx.createLinearGradient(-s/2, 0, s/2, 0);
-    if (this.isPlayer) {
-      var cDark = shadeColor(this.color, -0.35);
-      var cMid = shadeColor(this.color, 0.05);
-      bodyGrad.addColorStop(0, cDark); bodyGrad.addColorStop(0.3, cMid);
-      bodyGrad.addColorStop(0.7, cMid); bodyGrad.addColorStop(1, cDark);
+    if (this.buildGrid) {
+      this.drawBlockBody(s, sway);
     } else {
-      bodyGrad.addColorStop(0, "#aa2222"); bodyGrad.addColorStop(0.3, "#dd4444");
-      bodyGrad.addColorStop(0.7, "#dd4444"); bodyGrad.addColorStop(1, "#aa2222");
+      var bodyGrad = ctx.createLinearGradient(-s/2, 0, s/2, 0);
+      if (this.isPlayer) {
+        var cDark = shadeColor(this.color, -0.35);
+        var cMid = shadeColor(this.color, 0.05);
+        bodyGrad.addColorStop(0, cDark); bodyGrad.addColorStop(0.3, cMid);
+        bodyGrad.addColorStop(0.7, cMid); bodyGrad.addColorStop(1, cDark);
+      } else {
+        bodyGrad.addColorStop(0, "#aa2222"); bodyGrad.addColorStop(0.3, "#dd4444");
+        bodyGrad.addColorStop(0.7, "#dd4444"); bodyGrad.addColorStop(1, "#aa2222");
+      }
+      ctx.fillStyle = bodyGrad;
+      ctx.beginPath(); ctx.roundRect(-s/2 + 4, -s/3 + sway, s - 8, s * 0.62, 4);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.15)";
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(-s/2 + 8, -s/4 + sway); ctx.lineTo(s/2 - 8, -s/4 + sway);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.1)";
+      ctx.fillRect(-s/2 + 6, -s/3 + 2 + sway, s - 12, 5);
     }
-    ctx.fillStyle = bodyGrad;
-    ctx.beginPath(); ctx.roundRect(-s/2 + 4, -s/3 + sway, s - 8, s * 0.62, 4);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.15)";
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(-s/2 + 8, -s/4 + sway); ctx.lineTo(s/2 - 8, -s/4 + sway);
-    ctx.stroke();
-    ctx.fillStyle = "rgba(255,255,255,0.1)";
-    ctx.fillRect(-s/2 + 6, -s/3 + 2 + sway, s - 12, 5);
 
     // Exhaust smoke
     if (this.isPlayer && (this.lastMx !== 0 || this.lastMy !== 0)) {
@@ -2025,6 +2048,35 @@ class RobotArena {
     ctx.fillText(this.name, 0, s/2 + 16);
     ctx.shadowBlur = 0;
     ctx.restore();
+  }
+
+  drawBlockBody(s, sway) {
+    var cell = Math.max(7, Math.round((s * 1.2) / 5));
+    var off = -cell * 2;
+    var span = cell * 5;
+    var bodyCol = this.isPlayer ? shadeColor(this.color, -0.15) : shadeColor('#cc3333', -0.15);
+    ctx.fillStyle = 'rgba(0,0,0,0.30)';
+    ctx.beginPath(); ctx.roundRect(off - 1, off + 3 + sway, span + 2, span + 2, 9); ctx.fill();
+    ctx.fillStyle = this.isPlayer ? shadeColor(this.color, -0.45) : shadeColor('#7a2020', -0.3);
+    ctx.beginPath(); ctx.roundRect(off - 2, off - 2 + sway, span + 4, span + 4, 9); ctx.fill();
+    ctx.fillStyle = this.isPlayer ? shadeColor(this.color, -0.2) : shadeColor('#8f2f2f', -0.15);
+    ctx.beginPath(); ctx.roundRect(off, off + sway, span, span, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(off + 1.5, off - 0.5 + sway, span - 3, span - 3, 6); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    ctx.beginPath(); ctx.roundRect(off + 2, off + 2 + sway, span - 4, span * 0.28, 6); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.30)';
+    ctx.beginPath(); ctx.ellipse(off + span / 2, off + span + cell * 0.62, span * 0.55, cell * 0.24, 0, 0, Math.PI * 2); ctx.fill();
+    for (var r = 0; r < 5; r++) {
+      for (var c = 0; c < 5; c++) {
+        var val = this.buildGrid[r * 5 + c];
+        if (!val) continue;
+        var x = off + c * cell;
+        var y = off + r * cell + sway;
+        drawPartIcon(ctx, val, x, y, cell, bodyCol, partDir(this.buildGrid, r, c));
+      }
+    }
   }
 
   drawBunkerVisual() {
@@ -2186,12 +2238,17 @@ function startGameMP() {
     }
   }
   var sp = spawnPoints[myIdx % spawnPoints.length];
-  var ts = loggedInUser ? getTankStats() : { hp:200, speed:1.0, shield:0, dmg:1.0, color:'#88ccff' };
+  var ts = getTankStats();
   player = new RobotArena(sorted[myIdx].name || 'Player', sp.x, sp.y, true);
   player.maxHp = ts.hp;
   player.hp = ts.hp;
   player.speed = player.speed * ts.speed;
   player.shield = ts.shield;
+  player.diffDmgMult = ts.dmg;
+  player.w = ts.w;
+  player.buildGrid = buildGrid;
+  player.canFire = ts.counts.shots > 0;
+  selectedAbility = pickAbility(buildGrid);
   player.team = myTeam;
   player.color = teamColors[myTeam % teamColors.length];
 
@@ -2222,11 +2279,16 @@ function startGameMP() {
       if (sorted[mi2].id === playerId2) { myIdx2 = mi2; break; }
     }
     var sp2 = spawnPoints[myIdx2 % spawnPoints.length];
+    var ts2 = getTankStats(true);
     player2 = new RobotArena(sorted[myIdx2].name || 'P2', sp2.x, sp2.y, true);
-    player2.maxHp = ts.hp;
-    player2.hp = ts.hp;
-    player2.speed = player2.speed * ts.speed;
-    player2.shield = ts.shield;
+    player2.maxHp = ts2.hp;
+    player2.hp = ts2.hp;
+    player2.speed = player2.speed * ts2.speed;
+    player2.shield = ts2.shield;
+    player2.diffDmgMult = ts2.dmg;
+    player2.w = ts2.w;
+    player2.buildGrid = buildGrid2;
+    player2.canFire = ts2.counts.shots > 0;
     player2.team = playerTeams[playerId2] || myTeam;
     player2.color = (loggedInUser && ownedColors.indexOf(selectedP2Color) !== -1) ? selectedP2Color : '#ff8844';
   }
@@ -2296,7 +2358,7 @@ function startCampaign() {
   loadMoney();
   var input = document.getElementById('nameInput');
   var pName = input ? input.value.trim() || "MechWarrior" : "MechWarrior";
-  var ts = loggedInUser ? getTankStats() : { hp: 200, speed: 1.0, shield: 0, dmg: 1.0, color: '#88ccff' };
+  var ts = getTankStats();
   gameModeType = 'ffa';
   camX = 0;
   campaignLevel = 1;
@@ -2312,6 +2374,10 @@ function startCampaign() {
   player.speed = player.speed * ts.speed;
   player.shield = ts.shield;
   player.diffDmgMult = ts.dmg;
+  player.w = ts.w;
+  player.buildGrid = buildGrid;
+  player.canFire = ts.counts.shots > 0;
+  selectedAbility = pickAbility(buildGrid);
   player.color = (ownedColors.indexOf(selectedP1Color) !== -1) ? selectedP1Color : ts.color;
 
   var SEG = 800;
@@ -2415,13 +2481,17 @@ function startGame() {
   var pName = input ? input.value.trim() || "MechWarrior" : "MechWarrior";
   if (gameMode === 'multi') { startGameMP(); return; }
   if (gameMode === 'campaign') { startCampaign(); return; }
-  var ts = loggedInUser ? getTankStats() : { hp:200, speed:1.0, shield:0, dmg:1.0, color:'#88ccff' };
+  var ts = getTankStats();
   player = new RobotArena(pName, 150, 250, true);
   player.maxHp = ts.hp;
   player.hp = ts.hp;
   player.speed = player.speed * ts.speed;
   player.shield = ts.shield;
   player.diffDmgMult = ts.dmg;
+  player.w = ts.w;
+  player.buildGrid = buildGrid;
+  player.canFire = ts.counts.shots > 0;
+  selectedAbility = pickAbility(buildGrid);
   player.color = (ownedColors.indexOf(selectedP1Color) !== -1) ? selectedP1Color : ts.color;
   enemies = [];
   var pvpMode = gameMode === 'local2p' && local2pPvP;
@@ -2456,8 +2526,15 @@ function startGame() {
     } else {
       player2 = new RobotArena('P2', 150, 350, true);
     }
-    player2.maxHp = 200;
-    player2.hp = 200;
+    var ts2 = getTankStats(true);
+    player2.maxHp = ts2.hp;
+    player2.hp = ts2.hp;
+    player2.speed = player2.speed * ts2.speed;
+    player2.shield = ts2.shield;
+    player2.diffDmgMult = ts2.dmg;
+    player2.w = ts2.w;
+    player2.buildGrid = buildGrid2;
+    player2.canFire = ts2.counts.shots > 0;
     player2.color = (ownedColors.indexOf(selectedP2Color) !== -1) ? selectedP2Color : '#ff8844';
     player2.tankId = 'default';
     document.getElementById('player2HpRow').style.display = 'flex';
@@ -2673,6 +2750,7 @@ function player2ShootAuto() {
 // Fire button auto-fire in game loop
 
 function firePlayerAt(wx, wy) {
+  if (player && player.canFire === false) return;
   var loadout = (loggedInUser && ownedWeapons.length > 5) ? lobbyLoadout : [0,1,2,3,4];
   var w = weapons[loadout[selectedWeapon]] || weapons[0];
   if (w.special === "defend") {
@@ -2700,6 +2778,7 @@ function playerShoot() {
 }
 
 function player2Shoot() {
+  if (player2 && player2.canFire === false) return;
   var loadout = [0,1,2,3,4];
   var w = weapons[loadout[selectedWeapon2]] || weapons[2];
   if (w.special === "defend") {
@@ -3211,7 +3290,7 @@ function drawHUD() {
     ctx.fillText('[' + pw.name + ']', player.x, player.y + player.w/2 + 30);
     ctx.shadowBlur = 0;
   }
-  var ab = tankAbilities[selectedTankId];
+  var ab = tankAbilities[selectedAbility];
   if (ab && loggedInUser) {
     var abY = player.y + player.w/2 + 42;
     ctx.fillStyle = abilityCooldown > 0 ? '#ff6644' : '#44ff88';
@@ -3222,7 +3301,7 @@ function drawHUD() {
       ctx.strokeStyle = 'rgba(255,255,255,0.15)';
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
-      var pct = 1 - abilityCooldown / tankAbilities[selectedTankId].cooldown;
+      var pct = 1 - abilityCooldown / tankAbilities[selectedAbility].cooldown;
       ctx.strokeStyle = '#ff6644';
       ctx.beginPath(); ctx.arc(cx, cy, r, -Math.PI/2, -Math.PI/2 + Math.PI*2*pct); ctx.stroke();
     }
@@ -3807,10 +3886,13 @@ async function registerAccount() {
   ownedTanks = ['default']; selectedTankId = 'default'; upgradeLevels = {};
   ownedWeapons = [0,1,2,3,4]; lobbyLoadout = [0,1,2,3,4];
   ownedColors = ['#88ccff']; selectedP1Color = '#88ccff'; selectedP2Color = '#ff8844';
+  partMerge(null);
+  buildGrid = defaultBuild(); buildGrid2 = defaultBuild();
   try { localStorage.removeItem('rp_shop_' + user); } catch(e) {}
   try { localStorage.removeItem('rp_remember'); } catch(e) {}
   try { localStorage.removeItem('rp_money'); } catch(e) {}
   saveMoney();
+  saveShopData();
   rememberDevice(user, hash);
   onLogin();
 }
@@ -3835,7 +3917,7 @@ async function loginAccount() {
   if (!data) { showAccountStatus('Invalid username or password'); return; }
   offlineAccount = false;
   loggedInUser = user; profileId = data.id; money = data.money || 0; killCount = data.kills || 0; xp = data.xp || 0;
-  if (data.shop_data) { try { var sd = JSON.parse(data.shop_data); if (sd.ownedTanks) ownedTanks = sd.ownedTanks; if (sd.ownedWeapons) ownedWeapons = sd.ownedWeapons; if (sd.ownedColors) ownedColors = sd.ownedColors; if (sd.upgradeLevels) upgradeLevels = sd.upgradeLevels; if (sd.selectedTank) selectedTankId = sd.selectedTank; if (sd.selectedP1Color) selectedP1Color = sd.selectedP1Color; if (sd.selectedP2Color) selectedP2Color = sd.selectedP2Color; if (sd.lobbyLoadout) lobbyLoadout = sd.lobbyLoadout; } catch(e) {} }
+  if (data.shop_data) { try { var sd = JSON.parse(data.shop_data); if (sd.ownedTanks) ownedTanks = sd.ownedTanks; if (sd.ownedWeapons) ownedWeapons = sd.ownedWeapons; if (sd.ownedColors) ownedColors = sd.ownedColors; if (sd.upgradeLevels) upgradeLevels = sd.upgradeLevels; if (sd.selectedTank) selectedTankId = sd.selectedTank; if (sd.selectedP1Color) selectedP1Color = sd.selectedP1Color; if (sd.selectedP2Color) selectedP2Color = sd.selectedP2Color; if (sd.lobbyLoadout) lobbyLoadout = sd.lobbyLoadout; applyPartlyData(sd); } catch(e) {} }
   rememberDevice(user, hash);
   saveLocalProfileSnapshot();
   onLogin();
@@ -3888,7 +3970,9 @@ async function resetAccount() {
   ownedTanks = ['default']; selectedTankId = 'default'; upgradeLevels = {};
   ownedWeapons = [0,1,2,3,4]; lobbyLoadout = [0,1,2,3,4];
   ownedColors = ['#88ccff']; selectedP1Color = '#88ccff'; selectedP2Color = '#ff8844';
-  shopTab = 'tanks';
+  partMerge(null);
+  buildGrid = defaultBuild(); buildGrid2 = defaultBuild();
+  shopTab = 'parts';
   var ai = document.getElementById('accountInfo');
   var ab = document.getElementById('accountBtns');
   var mel = document.getElementById('moneyDisplay');
@@ -4155,7 +4239,7 @@ async function tryAutoLogin() {
     if (!data) { try { localStorage.removeItem('rp_remember'); } catch(e) {} return; }
     offlineAccount = false;
     loggedInUser = d.user; profileId = data.id; money = data.money || 0; killCount = data.kills || 0; xp = data.xp || 0;
-    if (data.shop_data) { try { var sd = JSON.parse(data.shop_data); if (sd.ownedTanks) ownedTanks = sd.ownedTanks; if (sd.ownedWeapons) ownedWeapons = sd.ownedWeapons; if (sd.ownedColors) ownedColors = sd.ownedColors; if (sd.upgradeLevels) upgradeLevels = sd.upgradeLevels; if (sd.selectedTank) selectedTankId = sd.selectedTank; if (sd.selectedP1Color) selectedP1Color = sd.selectedP1Color; if (sd.selectedP2Color) selectedP2Color = sd.selectedP2Color; if (sd.lobbyLoadout) lobbyLoadout = sd.lobbyLoadout; } catch(e) {} }
+    if (data.shop_data) { try { var sd = JSON.parse(data.shop_data); if (sd.ownedTanks) ownedTanks = sd.ownedTanks; if (sd.ownedWeapons) ownedWeapons = sd.ownedWeapons; if (sd.ownedColors) ownedColors = sd.ownedColors; if (sd.upgradeLevels) upgradeLevels = sd.upgradeLevels; if (sd.selectedTank) selectedTankId = sd.selectedTank; if (sd.selectedP1Color) selectedP1Color = sd.selectedP1Color; if (sd.selectedP2Color) selectedP2Color = sd.selectedP2Color; if (sd.lobbyLoadout) lobbyLoadout = sd.lobbyLoadout; applyPartlyData(sd); } catch(e) {} }
     saveLocalProfileSnapshot();
     onLogin();
   } catch(e) { try { localStorage.removeItem('rp_remember'); } catch(e2) {} }
@@ -4166,7 +4250,7 @@ function localProfileKey(u) { return 'rp_local_' + (u || ''); }
 function saveLocalProfileSnapshot() {
   if (!loggedInUser) return;
   try {
-    var shopData = JSON.stringify({ ownedTanks: ownedTanks, selectedTank: selectedTankId, upgradeLevels: upgradeLevels, ownedWeapons: ownedWeapons, lobbyLoadout: lobbyLoadout, ownedColors: ownedColors, selectedP1Color: selectedP1Color, selectedP2Color: selectedP2Color });
+    var shopData = JSON.stringify({ ownedTanks: ownedTanks, selectedTank: selectedTankId, upgradeLevels: upgradeLevels, ownedWeapons: ownedWeapons, lobbyLoadout: lobbyLoadout, ownedColors: ownedColors, selectedP1Color: selectedP1Color, selectedP2Color: selectedP2Color, parts: ownedParts, build: buildGrid, build2: buildGrid2 });
     var rem = null;
     try { rem = JSON.parse(localStorage.getItem('rp_remember') || 'null'); } catch(e) {}
     localStorage.setItem(localProfileKey(loggedInUser), JSON.stringify({
@@ -4187,7 +4271,7 @@ function offlineAccountLogin(user, hash) {
   if (!snap) return false;
   offlineAccount = true;
   loggedInUser = user; profileId = null; money = snap.money || 0; killCount = snap.kills || 0; xp = snap.xp || 0;
-  if (snap.shop_data) { try { var sd = JSON.parse(snap.shop_data); if (sd.ownedTanks) ownedTanks = sd.ownedTanks; if (sd.ownedWeapons) ownedWeapons = sd.ownedWeapons; if (sd.ownedColors) ownedColors = sd.ownedColors; if (sd.upgradeLevels) upgradeLevels = sd.upgradeLevels; if (sd.selectedTank) selectedTankId = sd.selectedTank; if (sd.selectedP1Color) selectedP1Color = sd.selectedP1Color; if (sd.selectedP2Color) selectedP2Color = sd.selectedP2Color; if (sd.lobbyLoadout) lobbyLoadout = sd.lobbyLoadout; } catch(e) {} }
+  if (snap.shop_data) { try { var sd = JSON.parse(snap.shop_data); if (sd.ownedTanks) ownedTanks = sd.ownedTanks; if (sd.ownedWeapons) ownedWeapons = sd.ownedWeapons; if (sd.ownedColors) ownedColors = sd.ownedColors; if (sd.upgradeLevels) upgradeLevels = sd.upgradeLevels; if (sd.selectedTank) selectedTankId = sd.selectedTank; if (sd.selectedP1Color) selectedP1Color = sd.selectedP1Color; if (sd.selectedP2Color) selectedP2Color = sd.selectedP2Color; if (sd.lobbyLoadout) lobbyLoadout = sd.lobbyLoadout; applyPartlyData(sd); } catch(e) {} }
   onLogin();
   return true;
 }
@@ -4197,7 +4281,7 @@ async function saveProfileStats() {
   if (s) s.textContent = '$' + money;
   if (loggedInUser) saveLocalProfileSnapshot();
   if (!profileId || !supabaseClient) { updateLobbyXp(); return; }
-  var shopData = JSON.stringify({ ownedTanks: ownedTanks, selectedTank: selectedTankId, upgradeLevels: upgradeLevels, ownedWeapons: ownedWeapons, lobbyLoadout: lobbyLoadout, ownedColors: ownedColors, selectedP1Color: selectedP1Color, selectedP2Color: selectedP2Color });
+  var shopData = JSON.stringify({ ownedTanks: ownedTanks, selectedTank: selectedTankId, upgradeLevels: upgradeLevels, ownedWeapons: ownedWeapons, lobbyLoadout: lobbyLoadout, ownedColors: ownedColors, selectedP1Color: selectedP1Color, selectedP2Color: selectedP2Color, parts: ownedParts, build: buildGrid, build2: buildGrid2 });
   try { await supabaseClient.from('profiles').update({ money: money, kills: killCount, xp: xp, shop_data: shopData }).eq('id', profileId); } catch(e) {}
   updateLobbyXp();
 }
@@ -4234,7 +4318,7 @@ function updateLobbyXp() {
 function updateAbilityBar() {
   var bar = document.getElementById('abilityBar');
   if (!bar || !gameActive || !player) { if(bar)bar.style.display='none'; return; }
-  var ab = tankAbilities[selectedTankId];
+  var ab = tankAbilities[selectedAbility];
   if (!ab || !loggedInUser) { bar.style.display='none'; return; }
   bar.style.display='flex';
   document.getElementById('abilityName').textContent = ab.name;
@@ -4246,13 +4330,13 @@ var abilityCooldown = 0;
 
 function useAbility() {
   if (!gameActive || !player || !player.alive() || abilityCooldown > 0) return;
-  var ab = tankAbilities[selectedTankId];
+  var ab = tankAbilities[selectedAbility];
   if (!ab || !loggedInUser) return;
   ab.activate(player);
   abilityCooldown = ab.cooldown;
   if (ab.duration) {
     player.abilityTimer = ab.duration;
-    if (selectedTankId === 'light') player._savedSpeed = player.speed;
+    if (selectedAbility === 'light') player._savedSpeed = player.speed;
   }
   updateAbilityBar();
 }
@@ -4310,6 +4394,144 @@ var tankColors = [
 ];
 var ownedTanks = ['default'];
 var selectedTankId = 'default';
+var partDefs = [
+  { id:'armor',  name:'Pantser', color:'#7a9cc6', hp:60, cost:400, desc:'+60 HP per blok | gewicht' },
+  { id:'wheel',  name:'Wiel', color:'#6b6b7a', speed:0.13, cost:500, desc:'+13% snelheid per blok | gewicht' },
+  { id:'energy', name:'Energie cel', color:'#5fd7f2', shield:30, cost:600, desc:'+30 schild per blok' },
+  { id:'cannon', name:'Kanon koepel', color:'#c9c3a8', cost:800, desc:'Grote koepel (1 vak) — schiet alleen als er een Loop direct naast staat' },
+  { id:'loop', name:'Loop', color:'#2a2a34', cost:500, desc:'Kanontoren (1 vak) — geeft +1 schot naast een koepel' },
+  { id:'cannonS', name:'Klein kanon', color:'#8a8a96', cost:650, desc:'Kleine koepel + loop in 1 vak — werkt los' },
+];
+var starterParts = { armor:4, wheel:3, cannon:1, loop:1, energy:0, cannonS:0 };
+var ownedParts = { armor:4, wheel:3, cannon:1, loop:1, energy:0, cannonS:0 };
+function emptyGrid() {
+  var g = [];
+  for (var i = 0; i < 25; i++) g.push('');
+  return g;
+}
+function defaultBuild() {
+  var g = emptyGrid();
+  g[5]='armor'; g[6]='armor'; g[7]='armor'; g[8]='cannon'; g[9]='loop';
+  g[10]='wheel'; g[12]='wheel'; g[14]='wheel'; g[15]='armor';
+  return g;
+}
+var buildGrid = defaultBuild();
+var buildGrid2 = defaultBuild();
+var buildSlot = 1;
+var buildPalettePart = 'armor';
+var buildPendingMode = 'single';
+var selectedAbility = 'default';
+function normGrid(g) {
+  var out = emptyGrid();
+  if (!g || !g.length) return out;
+  for (var i = 0; i < 25; i++) {
+    var v = g[i];
+    out[i] = (v === 'armor' || v === 'wheel' || v === 'cannon' || v === 'loop' || v === 'cannonS' || v === 'energy') ? v : '';
+  }
+  return out;
+}
+function partMerge(parts) {
+  ownedParts = {};
+  for (var pk in starterParts) ownedParts[pk] = starterParts[pk];
+  if (parts && typeof parts === 'object') {
+    for (var k in starterParts) if (typeof parts[k] === 'number' && parts[k] >= 0) ownedParts[k] = parts[k];
+  }
+}
+function migrateUpgrades() {
+  var any = false;
+  for (var key in upgradeLevels) {
+    var und = key.split('_');
+    if (und.length === 2 && und[1] && upgradeLevels.hasOwnProperty(und[1]) === false) {
+      for (var j = 0; j < upgradeDefs.length; j++) {
+        if (upgradeDefs[j].id === und[1]) {
+          upgradeLevels[und[1]] = upgradeLevels[key];
+          delete upgradeLevels[key];
+          any = true;
+          break;
+        }
+      }
+    }
+  }
+  return any;
+}
+function applyPartlyData(sd) {
+  if (!sd) return;
+  if (sd.parts && typeof sd.parts === 'object') partMerge(sd.parts);
+  else partMerge(null);
+  if (sd.build) buildGrid = normGrid(sd.build); else buildGrid = defaultBuild();
+  if (sd.build2) buildGrid2 = normGrid(sd.build2); else buildGrid2 = defaultBuild();
+}
+function countParts(grid) {
+  var c = { armor:0, wheel:0, cannon:0, energy:0, dmg:0, total:0, armorHp:0, wheelSpeed:0, cannonDmg:0, shieldEn:0 };
+  for (var pid = 0; pid < partDefs.length; pid++) {
+    var pd = partDefs[pid];
+    c[pd.id] = 0;
+  }
+  c.dmg = 0; c.total = 0;
+  for (var i = 0; i < 25; i++) {
+    var v = grid[i];
+    if (!v || v === 'core') continue;
+    if (c[v] !== undefined) c[v] = c[v] + 1;
+    c.total++;
+    var pdef = null;
+    for (var j = 0; j < partDefs.length; j++) { if (partDefs[j].id === v) { pdef = partDefs[j]; break; } }
+    if (!pdef) continue;
+    if (pdef.hp) c.armorHp += pdef.hp;
+    if (pdef.speed) c.wheelSpeed += pdef.speed;
+    if (pdef.dmg) c.cannonDmg += pdef.dmg;
+    if (pdef.shield) c.shieldEn += pdef.shield;
+  }
+  return c;
+}
+function countShots(grid) {
+  var g = grid || buildGrid;
+  var shots = 0;
+  for (var i = 0; i < 25; i++) {
+    if (g[i] !== 'loop') continue;
+    var r = Math.floor(i / 5), cc = i % 5;
+    if (r > 0 && g[i - 5] === 'cannon') shots++;
+    else if (r < 4 && g[i + 5] === 'cannon') shots++;
+    else if (cc > 0 && g[i - 1] === 'cannon') shots++;
+    else if (cc < 4 && g[i + 1] === 'cannon') shots++;
+  }
+  shots += (countParts(g).cannonS || 0);
+  return shots;
+}
+function partDir(grid, r, c) {
+  var g = grid || buildGrid;
+  for (var rr = Math.max(0, r - 1); rr <= Math.min(4, r + 1); rr++) {
+    for (var cc = Math.max(0, c - 1); cc <= Math.min(4, c + 1); cc++) {
+      if (rr === r && cc === c) continue;
+      if (Math.abs(rr - r) + Math.abs(cc - c) !== 1) continue;
+      if (g[rr * 5 + cc] === 'cannon') {
+        var dx = c - cc, dy = r - rr;
+        var dl = Math.hypot(dx, dy) || 1;
+        return [dx / dl, dy / dl];
+      }
+    }
+  }
+  var mx = c - 2, my = r - 2, md = Math.hypot(mx, my) || 1;
+  return [mx / md, my / md];
+}
+function computeBuildStats(grid) {
+  var c = countParts(grid || buildGrid);
+  var shots = countShots(grid || buildGrid);
+  c.shots = shots;
+  var hp = 20 + c.armorHp;
+  var shield = c.shieldEn;
+  var dmg = 1 + 0.15 * shots;
+  var speed = 0;
+  if (c.wheel > 0) speed = Math.min(1.6, Math.max(0.5, 0.55 + 0.13 * c.wheel - 0.015 * c.total));
+  var w = Math.min(64, Math.round(34 + c.total * 1.3));
+  return { hp: Math.round(hp), shield: shield, dmg: Math.round(dmg * 100) / 100, speed: Math.round(speed * 100) / 100, w: w, counts: c };
+}
+function pickAbility(grid) {
+  var c = countParts(grid || buildGrid);
+  if (c.wheel >= 2) return 'light';
+  if (countShots(grid || buildGrid) > 0) return 'sniper';
+  if (c.energy >= 1) return 'shield';
+  return 'default';
+}
 var ownedColors = ['#88ccff'];
 var selectedP1Color = '#88ccff';
 var selectedP2Color = '#ff8844';
@@ -4318,16 +4540,16 @@ var ownedWeapons = [0,1,2,3,4];
 var xp = 0;
 function getLevel(xp) { return Math.floor(xp / 100) + 1; }
 var lobbyLoadout = [0,1,2,3,4];
-var shopTab = 'tanks';
+var shopTab = 'parts';
 
 function getShopData() {
   try {
     var raw = localStorage.getItem('rp_shop_' + loggedInUser);
-    if (raw) { var d = JSON.parse(raw); ownedTanks = d.ownedTanks || ['default']; selectedTankId = d.selectedTank || 'default'; upgradeLevels = d.upgradeLevels || {}; ownedWeapons = d.ownedWeapons || [0,1,2,3,4]; lobbyLoadout = d.lobbyLoadout || [0,1,2,3,4]; xp = d.xp || 0; ownedColors = d.ownedColors || ['#88ccff']; selectedP1Color = d.selectedP1Color || '#88ccff'; selectedP2Color = d.selectedP2Color || '#ff8844'; }
-  } catch(e) {}
+    if (raw) { var d = JSON.parse(raw); ownedTanks = d.ownedTanks || ['default']; selectedTankId = d.selectedTank || 'default'; upgradeLevels = d.upgradeLevels || {}; ownedWeapons = d.ownedWeapons || [0,1,2,3,4]; lobbyLoadout = d.lobbyLoadout || [0,1,2,3,4]; xp = d.xp || 0; ownedColors = d.ownedColors || ['#88ccff']; selectedP1Color = d.selectedP1Color || '#88ccff'; selectedP2Color = d.selectedP2Color || '#ff8844'; applyPartlyData(d); }
+  } catch(e) { applyPartlyData(null); }
 }
 function saveShopData() {
-  try { localStorage.setItem('rp_shop_' + loggedInUser, JSON.stringify({ownedTanks:ownedTanks,selectedTank:selectedTankId,upgradeLevels:upgradeLevels,ownedWeapons:ownedWeapons,lobbyLoadout:lobbyLoadout,xp:xp,money:money,ownedColors:ownedColors,selectedP1Color:selectedP1Color,selectedP2Color:selectedP2Color})); } catch(e) {}
+  try { localStorage.setItem('rp_shop_' + loggedInUser, JSON.stringify({ownedTanks:ownedTanks,selectedTank:selectedTankId,upgradeLevels:upgradeLevels,ownedWeapons:ownedWeapons,lobbyLoadout:lobbyLoadout,xp:xp,money:money,ownedColors:ownedColors,selectedP1Color:selectedP1Color,selectedP2Color:selectedP2Color,parts:ownedParts,build:buildGrid,build2:buildGrid2})); } catch(e) {}
   saveMoney();
   if (loggedInUser) saveProfileStats();
 }
@@ -4337,13 +4559,13 @@ function showShop() {
   getShopData();
   document.getElementById('shopOverlay').classList.add('show');
   document.getElementById('shopMoney').textContent = '$' + money + '  |  Lv.' + getLevel(xp) + ' (' + xp + 'XP)';
-  shopTab = 'tanks';
-  document.getElementById('shopTabTanks').className = 'shop-tab active';
+  shopTab = 'parts';
+  document.getElementById('shopTabParts').className = 'shop-tab active';
   document.getElementById('shopTabUpgrades').className = 'shop-tab';
   document.getElementById('shopTabWeapons').className = 'shop-tab';
   document.getElementById('shopTabColors').className = 'shop-tab';
   document.getElementById('shopTabCollection').className = 'shop-tab';
-  renderShopTanks();
+  renderShopParts();
 }
 function hideShop() {
   document.getElementById('shopOverlay').classList.remove('show');
@@ -4353,51 +4575,64 @@ function hideShop() {
 
 function showShopTab(tab) {
   shopTab = tab;
-  document.getElementById('shopTabTanks').className = 'shop-tab' + (tab==='tanks'?' active':'');
+  document.getElementById('shopTabParts').className = 'shop-tab' + (tab==='parts'?' active':'');
   document.getElementById('shopTabUpgrades').className = 'shop-tab' + (tab==='upgrades'?' active':'');
   document.getElementById('shopTabWeapons').className = 'shop-tab' + (tab==='weapons'?' active':'');
   document.getElementById('shopTabColors').className = 'shop-tab' + (tab==='colors'?' active':'');
   document.getElementById('shopTabCollection').className = 'shop-tab' + (tab==='collection'?' active':'');
-  if (tab === 'tanks') renderShopTanks();
+  if (tab === 'parts') renderShopParts();
   else if (tab === 'upgrades') renderShopUpgrades();
   else if (tab === 'weapons') renderShopWeapons();
   else if (tab === 'colors') renderShopColors();
   else renderShopCollection();
 }
 
-function renderShopTanks() {
+function renderShopParts() {
   var el = document.getElementById('shopList');
-  var html = '';
-  for (var i = 0; i < tankTypes.length; i++) {
-    var t = tankTypes[i];
-    var owned = ownedTanks.indexOf(t.id) !== -1;
-    var equipped = selectedTankId === t.id;
-    var canBuy = !owned && money >= t.cost;
-    html += '<div class="shop-item' + (owned?' owned':'') + (equipped?' equipped':'') + '">';
+  var html = '<div style="color:#888;font-size:10px;text-align:center;margin-bottom:6px">Bouw blokken — koop per stuk, verbruikt in de tank bouwer</div>';
+  for (var i = 0; i < partDefs.length; i++) {
+    var p = partDefs[i];
+    var own = ownedParts[p.id] || 0;
+    var canBuy = money >= p.cost;
+    var stat = '';
+    if (p.hp) stat = '+60 HP | gewicht';
+    else if (p.speed) stat = '+13% snelheid | gewicht';
+    else if (p.shield) stat = '+30 schild';
+    else if (p.id === 'cannon') stat = 'schiet alleen met Loop ernaast';
+    else if (p.id === 'loop') stat = '+1 schot naast een koepel';
+    else if (p.id === 'cannonS') stat = '+1 schot, los werkend';
+    html += '<div class="shop-item">';
     html += '<div style="flex:1;min-width:0">';
-    html += '<div class="si-name" style="color:' + t.color + '">' + t.name + '</div>';
-    html += '<div class="si-desc">' + t.desc + '</div>';
-    html += '<div class="si-stats">HP ' + t.hp + ' | SPD ' + Math.round(t.speed*100) + '%' + (t.shield?' | SHIELD '+t.shield:'') + (t.dmgMult>1?' | DMG +'+Math.round((t.dmgMult-1)*100)+'%':'') + ' | Lv.' + t.levelReq + '</div>';
+    html += '<div class="si-name"><span style="display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:middle;margin-right:6px;background:' + p.color + ';border:1px solid rgba(255,255,255,0.3)"></span>' + p.name + '</div>';
+    html += '<div class="si-desc">' + p.desc + '</div>';
+    html += '<div class="si-stats">' + stat + ' | in bezit: ' + own + '</div>';
     html += '</div>';
-    var lvl = getLevel(xp);
-    if (equipped) html += '<button class="shop-btn owned-btn" disabled>EQUIPPED</button>';
-    else if (owned) html += '<button class="shop-btn equip" onclick="selectTank(\'' + t.id + '\')">Equip</button>';
-    else if (lvl < t.levelReq) html += '<button class="shop-btn" disabled>Lv.' + t.levelReq + ' req</button>';
-    else html += '<button class="shop-btn" onclick="buyTank(\'' + t.id + '\')"' + (canBuy?'':' disabled') + '>$' + t.cost + '</button>';
+    html += '<button class="shop-btn" onclick="buyPart(\'' + p.id + '\')"' + (canBuy?'':' disabled') + '>$' + p.cost + '</button>';
     html += '</div>';
   }
   el.innerHTML = html;
 }
 
+function buyPart(id) {
+  var p = null;
+  for (var i = 0; i < partDefs.length; i++) { if (partDefs[i].id === id) { p = partDefs[i]; break; } }
+  if (!p) return;
+  if (money < p.cost) return;
+  money -= p.cost;
+  ownedParts[id] = (ownedParts[id] || 0) + 1;
+  saveShopData();
+  document.getElementById('shopMoney').textContent = '$' + money + '  |  Lv.' + getLevel(xp) + ' (' + xp + 'XP)';
+  if (shopTab === 'parts') renderShopParts();
+  else if (shopTab === 'collection') renderShopCollection();
+}
+
 function renderShopUpgrades() {
   var el = document.getElementById('shopList');
-  var tt = null;
-  for (var i = 0; i < tankTypes.length; i++) { if (tankTypes[i].id === selectedTankId) { tt = tankTypes[i]; break; } }
-  var html = '<div style="color:#888;font-size:10px;text-align:center;margin-bottom:6px">Upgrades for <span style="color:' + (tt?tt.color:'#888') + '">' + (tt?tt.name:'?') + '</span></div>';
+  migrateUpgrades();
+  var html = '<div style="color:#888;font-size:10px;text-align:center;margin-bottom:6px">Upgrades (geldt bovenop je gebouwde tank)</div>';
   for (var i = 0; i < upgradeDefs.length; i++) {
     var u = upgradeDefs[i];
-    var key = selectedTankId + '_' + u.id;
-    var level = upgradeLevels[key] || 0;
+    var level = upgradeLevels[u.id] || 0;
     var maxed = level >= u.levels;
     var canBuy = !maxed && money >= u.cost[level];
     var val = u.bonus[level];
@@ -4425,29 +4660,298 @@ function buyTank(id) {
   selectedTankId = id;
   saveShopData();
   document.getElementById('shopMoney').textContent = '$' + money + '  |  Lv.' + getLevel(xp) + ' (' + xp + 'XP)';
-  renderShopTanks();
+  renderShopParts();
 }
 
 function selectTank(id) {
   if (ownedTanks.indexOf(id) === -1) return;
   selectedTankId = id;
   saveShopData();
-  renderShopTanks();
+  renderShopParts();
 }
 
 function buyUpgrade(id) {
   var u = null;
   for (var i = 0; i < upgradeDefs.length; i++) { if (upgradeDefs[i].id === id) { u = upgradeDefs[i]; break; } }
   if (!u) return;
-  var key = selectedTankId + '_' + id;
-  var level = upgradeLevels[key] || 0;
+  migrateUpgrades();
+  var level = upgradeLevels[id] || 0;
   if (level >= u.levels) return;
   if (money < u.cost[level]) return;
   money -= u.cost[level];
-  upgradeLevels[key] = level + 1;
+  upgradeLevels[id] = level + 1;
   saveShopData();
   document.getElementById('shopMoney').textContent = '$' + money + '  |  Lv.' + getLevel(xp) + ' (' + xp + 'XP)';
   renderShopUpgrades();
+}
+
+// ---- TANK BUILDER ----
+function startFlow() {
+  if (gameMode === 'campaign') openBuilder('campaign');
+  else if (gameMode === 'local2p') openBuilder('local2p');
+  else if (gameMode === 'multi') startGame();
+  else openBuilder('single');
+}
+function openBuilder(mode) {
+  buildPendingMode = mode || 'single';
+  document.getElementById('buildOverlay').classList.add('show');
+  var is2p = (mode === 'local2p');
+  document.getElementById('buildPlayerTabs').style.display = is2p ? 'flex' : 'none';
+  var p2tab = document.getElementById('buildTabP2');
+  if (p2tab) p2tab.style.display = is2p ? '' : 'none';
+  document.getElementById('builderReadyBtn').textContent = (mode === 'multi') ? '✓ OPSLAAN' : '✓ START GEVECHT';
+  if (!is2p) buildSlot = 1;
+  var bc = document.getElementById('buildCanvas');
+  bc.onmousedown = buildCanvasClick;
+  bc.oncontextmenu = function(ev) { ev.preventDefault(); };
+  setBuildSlot(buildSlot);
+}
+function closeBuilder() {
+  document.getElementById('buildOverlay').classList.remove('show');
+}
+function setBuildSlot(slot) {
+  buildSlot = slot;
+  var t1 = document.getElementById('buildTabP1');
+  var t2 = document.getElementById('buildTabP2');
+  if (t1) t1.className = 'shop-tab' + (slot === 1 ? ' active' : '');
+  if (t2) t2.className = 'shop-tab' + (slot === 2 ? ' active' : '');
+  buildRenderAll();
+}
+function builderGrid() { return buildSlot === 2 ? buildGrid2 : buildGrid; }
+function buildRenderAll() {
+  buildRenderPalette();
+  buildDrawCanvas();
+  buildRenderStats();
+}
+function buildRenderPalette() {
+  var el = document.getElementById('buildPalette');
+  var html = '';
+  for (var i = 0; i < partDefs.length; i++) {
+    var p = partDefs[i];
+    var cnt = ownedParts[p.id] || 0;
+    var sel = buildPalettePart === p.id ? ' border:1px solid #4a4aff;background:rgba(74,74,255,0.15);' : ' border:1px solid rgba(255,255,255,0.1);';
+    html += '<div onclick="buildSelectPart(\'' + p.id + '\')" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;' + sel + '">';
+    html += '<span style="width:18px;height:18px;border-radius:3px;background:' + p.color + ';border:1px solid rgba(255,255,255,0.3)"></span>';
+    html += '<div style="flex:1;min-width:0"><div style="color:#ddd;font-size:11px;font-weight:bold">' + p.name + '</div>';
+    html += '<div style="color:#777;font-size:9px">' + p.desc + '</div></div>';
+    html += '<div style="text-align:right"><div style="color:#ffdd44;font-size:10px">x' + cnt + '</div>';
+    html += '<div style="color:#888;font-size:9px">$' + p.cost + '</div></div>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+function buildSelectPart(id) {
+  var found = false;
+  for (var i = 0; i < partDefs.length; i++) { if (partDefs[i].id === id) found = true; }
+  if (!found) return;
+  buildPalettePart = id;
+  buildRenderAll();
+}
+function buildCanvasClick(ev) {
+  var cvs = ev.target;
+  var rect = cvs.getBoundingClientRect();
+  if (!rect) return;
+  var sx = cvs.width / rect.width;
+  var sy = cvs.height / rect.height;
+  var x = (ev.clientX - rect.left) * sx;
+  var y = (ev.clientY - rect.top) * sy;
+  var cell = Math.max(1, cvs.width / 5);
+  var r = Math.floor(y / cell);
+  var c = Math.floor(x / cell);
+  if (r < 0 || r > 4 || c < 0 || c > 4) return;
+  var idx = r * 5 + c;
+  var grid = builderGrid();
+  var remove = ev.button === 2;
+  if (remove) {
+    var v = grid[idx];
+    if (v) {
+      grid[idx] = '';
+      ownedParts[v] = (ownedParts[v] || 0) + 1;
+      buildRenderAll();
+    }
+  } else {
+    if (grid[idx]) {
+      var old = grid[idx];
+      grid[idx] = '';
+      ownedParts[old] = (ownedParts[old] || 0) + 1;
+      buildRenderAll();
+      return;
+    }
+    var chosen = buildPalettePart;
+    if ((ownedParts[chosen] || 0) <= 0) return;
+    grid[idx] = chosen;
+    ownedParts[chosen] = ownedParts[chosen] - 1;
+    buildRenderAll();
+  }
+}
+function buildDrawCanvas() {
+  var cv = document.getElementById('buildCanvas');
+  if (!cv) return;
+  var ctxb = cv.getContext('2d');
+  var cell = 50;
+  var grid = builderGrid();
+  ctxb.clearRect(0, 0, 250, 250);
+  ctxb.fillStyle = '#10101f';
+  ctxb.fillRect(0, 0, 250, 250);
+  ctxb.strokeStyle = 'rgba(255,255,255,0.07)';
+  ctxb.lineWidth = 1;
+  for (var g = 0; g <= 5; g++) {
+    ctxb.beginPath(); ctxb.moveTo(g * cell + 0.5, 0); ctxb.lineTo(g * cell + 0.5, 250); ctxb.stroke();
+    ctxb.beginPath(); ctxb.moveTo(0, g * cell + 0.5); ctxb.lineTo(250, g * cell + 0.5); ctxb.stroke();
+  }
+  for (var r = 0; r < 5; r++) {
+    for (var c = 0; c < 5; c++) {
+      ctxb.fillStyle = '#17172a';
+      ctxb.fillRect(c * cell + 1, r * cell + 1, cell - 2, cell - 2);
+      ctxb.strokeStyle = 'rgba(255,255,255,0.06)';
+      ctxb.lineWidth = 1;
+      ctxb.strokeRect(c * cell + 0.5, r * cell + 0.5, cell - 1, cell - 1);
+      var val = grid[r * 5 + c];
+      if (!val) continue;
+      drawPartIcon(ctxb, val, c * cell, r * cell, cell, null, partDir(grid, r, c));
+    }
+  }
+}
+function drawBarrel(bctx, cx, cy, dir, half, tw, mw) {
+  var dx = 1, dy = 0;
+  if (dir && (dir[0] !== 0 || dir[1] !== 0)) { dx = dir[0]; dy = dir[1]; }
+  var ang = Math.atan2(dy, dx);
+  bctx.strokeStyle = '#2c2c36';
+  bctx.lineCap = 'round';
+  bctx.lineWidth = tw * 2;
+  bctx.beginPath();
+  bctx.moveTo(cx - dx * half, cy - dy * half);
+  bctx.lineTo(cx + dx * half, cy + dy * half);
+  bctx.stroke();
+  var px = cx + dx * (half + 2), py = cy + dy * (half + 2);
+  bctx.save();
+  bctx.translate(px, py);
+  bctx.rotate(ang);
+  bctx.fillStyle = '#14141c';
+  bctx.fillRect(0, -mw * 2, mw * 1.6, mw * 4);
+  bctx.restore();
+  bctx.save();
+  bctx.translate(cx - dx * half, cy - dy * half);
+  bctx.rotate(ang);
+  bctx.fillStyle = '#46464f';
+  bctx.fillRect(-mw * 0.6, -tw * 1.5, mw * 1.2, tw);
+  bctx.fillRect(-mw * 0.6, tw * 0.5, mw * 1.2, tw);
+  bctx.restore();
+}
+function drawPartIcon(bctx, val, x, y, cs, bodyColor, dir) {
+  var cx = x + cs / 2, cy = y + cs / 2;
+  var pad = 1;
+  if (val === 'armor') {
+    var col = bodyColor || '#7a9cc6';
+    bctx.fillStyle = col;
+    bctx.beginPath(); bctx.roundRect(x + pad, y + pad, cs - pad * 2, cs - pad * 2, 3); bctx.fill();
+    bctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    bctx.lineWidth = 1;
+    bctx.beginPath(); bctx.roundRect(x + pad, y + pad, cs - pad * 2, cs - pad * 2, 3); bctx.stroke();
+    bctx.fillStyle = 'rgba(255,255,255,0.18)';
+    bctx.beginPath(); bctx.roundRect(x + pad + 1, y + pad + 1, cs - pad * 2 - 2, (cs - pad * 2) * 0.36, 2); bctx.fill();
+    bctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    bctx.beginPath(); bctx.moveTo(x + 3, y + cs - 3); bctx.lineTo(x + cs - 3, y + 3); bctx.stroke();
+    bctx.fillStyle = 'rgba(0,0,0,0.4)';
+    var rv = Math.max(2, cs * 0.09);
+    bctx.fillRect(x + 2, y + 2, rv, rv);
+    bctx.fillRect(x + cs - 2 - rv, y + 2, rv, rv);
+    bctx.fillRect(x + 2, y + cs - 2 - rv, rv, rv);
+    bctx.fillRect(x + cs - 2 - rv, y + cs - 2 - rv, rv, rv);
+  } else if (val === 'wheel') {
+    var wy = cy + cs * 0.08;
+    bctx.fillStyle = 'rgba(0,0,0,0.28)';
+    bctx.beginPath(); bctx.ellipse(cx, wy + cs * 0.41, cs * 0.40, cs * 0.07, 0, 0, Math.PI * 2); bctx.fill();
+    bctx.fillStyle = '#1c1c26';
+    bctx.beginPath(); bctx.arc(cx, wy, cs * 0.41, 0, Math.PI * 2); bctx.fill();
+    bctx.strokeStyle = 'rgba(255,255,255,0.10)';
+    bctx.lineWidth = Math.max(1.5, cs * 0.04);
+    bctx.beginPath(); bctx.arc(cx, wy, cs * 0.28, Math.PI * 1.15, Math.PI * 1.65); bctx.stroke();
+    bctx.strokeStyle = '#3a4552';
+    bctx.lineWidth = Math.max(1.5, cs * 0.06);
+    bctx.beginPath(); bctx.arc(cx, wy, cs * 0.34, Math.PI, Math.PI * 2); bctx.stroke();
+    bctx.fillStyle = '#3c3c48';
+    bctx.beginPath(); bctx.arc(cx, wy, cs * 0.23, 0, Math.PI * 2); bctx.fill();
+    bctx.strokeStyle = '#c8c8d4';
+    bctx.lineWidth = Math.max(1, cs * 0.05);
+    bctx.beginPath(); bctx.arc(cx, wy, cs * 0.23, 0, Math.PI * 2); bctx.stroke();
+    bctx.fillStyle = '#d8d8e2';
+    bctx.beginPath(); bctx.arc(cx, wy, cs * 0.07, 0, Math.PI * 2); bctx.fill();
+    bctx.fillStyle = 'rgba(30,30,40,0.9)';
+    bctx.beginPath(); bctx.arc(cx, wy, cs * 0.04, 0, Math.PI * 2); bctx.fill();
+  } else if (val === 'cannon') {
+    bctx.fillStyle = '#2a2a33';
+    bctx.beginPath(); bctx.roundRect(x + 2, y + cs * 0.55, cs - 4, cs * 0.42, 4); bctx.fill();
+    bctx.fillStyle = 'rgba(255,255,255,0.08)';
+    bctx.beginPath(); bctx.roundRect(x + 3, y + cs * 0.57, cs - 6, cs * 0.14, 3); bctx.fill();
+    bctx.fillStyle = 'rgba(20,22,30,0.9)';
+    bctx.beginPath(); bctx.ellipse(cx, cy + cs * 0.30, cs * 0.46, cs * 0.16, 0, 0, Math.PI * 2); bctx.fill();
+    var grad = bctx.createRadialGradient(cx - cs * 0.18, cy - cs * 0.24, cs * 0.05, cx, cy, cs * 0.5);
+    grad.addColorStop(0, '#eae6da');
+    grad.addColorStop(0.55, '#b4afa0');
+    grad.addColorStop(1, '#6a665a');
+    bctx.fillStyle = grad;
+    bctx.beginPath(); bctx.arc(cx, cy - cs * 0.10, cs * 0.42, Math.PI, Math.PI * 2); bctx.fill();
+    bctx.fillStyle = '#3a382f';
+    bctx.beginPath(); bctx.ellipse(cx, cy - cs * 0.20, cs * 0.20, cs * 0.12, 0, 0, Math.PI * 2); bctx.fill();
+    bctx.fillStyle = '#14141c';
+    bctx.beginPath(); bctx.roundRect(cx - cs * 0.05, cy - cs * 0.34, cs * 0.10, cs * 0.30, 2); bctx.fill();
+  } else if (val === 'loop') {
+    drawBarrel(bctx, cx, cy, dir, cs * 0.46, cs * 0.22, cs * 0.13);
+  } else if (val === 'cannonS') {
+    var ddx = dir && (dir[0] !== 0 || dir[1] !== 0) ? dir[0] : 1;
+    var ddy = dir && (dir[0] !== 0 || dir[1] !== 0) ? dir[1] : 0;
+    bctx.fillStyle = 'rgba(20,22,30,0.9)';
+    bctx.beginPath(); bctx.ellipse(cx - ddx * cs * 0.06, cy - ddy * cs * 0.06 + cs * 0.20, cs * 0.26, cs * 0.10, 0, 0, Math.PI * 2); bctx.fill();
+    var g2 = bctx.createRadialGradient(cx - ddx * cs * 0.12, cy - ddy * cs * 0.12 - cs * 0.12, cs * 0.03, cx, cy, cs * 0.26);
+    g2.addColorStop(0, '#e0dccf');
+    g2.addColorStop(0.6, '#a8a396');
+    g2.addColorStop(1, '#5c584e');
+    bctx.fillStyle = g2;
+    bctx.beginPath(); bctx.arc(cx - ddx * cs * 0.10, cy - ddy * cs * 0.10 - cs * 0.04, cs * 0.22, Math.PI, Math.PI * 2); bctx.fill();
+    drawBarrel(bctx, cx + ddx * cs * 0.04, cy + ddy * cs * 0.04, dir, cs * 0.36, cs * 0.11, cs * 0.07);
+  } else if (val === 'energy') {
+    bctx.fillStyle = '#103a4a';
+    bctx.beginPath(); bctx.roundRect(x + pad, y + pad, cs - pad * 2, cs - pad * 2, 3); bctx.fill();
+    bctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    bctx.lineWidth = 1;
+    bctx.beginPath(); bctx.roundRect(x + pad, y + pad, cs - pad * 2, cs - pad * 2, 3); bctx.stroke();
+    bctx.shadowColor = '#8eeaff';
+    bctx.shadowBlur = cs * 0.3;
+    bctx.fillStyle = '#aef4ff';
+    bctx.beginPath(); bctx.arc(cx, cy, cs * 0.24, 0, Math.PI * 2); bctx.fill();
+    bctx.shadowBlur = 0;
+    bctx.strokeStyle = 'rgba(142,234,255,0.5)';
+    bctx.beginPath(); bctx.arc(cx, cy, cs * 0.4, 0, Math.PI * 2); bctx.stroke();
+  }
+}
+function buildRenderStats() {
+  var el = document.getElementById('buildStats');
+  var st = computeBuildStats(builderGrid());
+  var ab = tankAbilities[pickAbility(builderGrid())];
+  var warn = '';
+  if (st.counts.shots === 0) warn += '<div style="color:#ff6644;font-size:10px;margin-top:4px">⚠ GEEN WERKEND KANON — zet een Loop naast een koepel, of gebruik een klein kanon!</div>';
+  if (st.counts.wheel === 0) warn += '<div style="color:#ff6644;font-size:10px">⚠ GEEN WIELEN — staat volledig stil!</div>';
+  else if (st.counts.armor === 0 && st.counts.total === 0) warn += '<div style="color:#ff6644;font-size:10px">⚠ GEEN PANTSER — bijna geen HP!</div>';
+  el.innerHTML =
+    '<div style="font-weight:bold;margin-bottom:4px">'+ (buildSlot === 2 ? 'P2 TANK' : 'JOUW TANK') + '</div>' +
+    '<div>❤️ HP: <b style="color:#ff8888">' + st.hp + '</b></div>' +
+    '<div>🛡 Schild: <b style="color:#66ddff">' + st.shield + '</b></div>' +
+    '<div>💥 Schade: <b style="color:#ffcc66">x' + st.dmg + '</b></div>' +
+    '<div>🏎 Snelheid: <b style="color:#88ff88">' + Math.round(st.speed * 100) + '%</b></div>' +
+    '<div>📐 Grootte: <b style="color:#ccb">' + st.w + 'px</b></div>' +
+    '<div>Blokken: <b>' + st.counts.total + '</b> (' + st.counts.armor + ' pantser, ' + st.counts.wheel + ' wiel, ' + st.counts.energy + ' energie)</div>' +
+    '<div>Kanon: <b>' + st.counts.shots + ' schot</b> (' + (st.counts.cannon || 0) + ' koepel, ' + (st.counts.loop || 0) + ' loop, ' + (st.counts.cannonS || 0) + ' klein)</div>' +
+    '<div style="margin-top:6px;font-size:10px;color:#aab">Ability: <b style="color:' + (ab ? '#ffdd44' : '#888') + '">' + (ab ? ab.name : '-') + '</b></div>' +
+    warn;
+}
+function builderReady() {
+  builderGrid();
+  if (loggedInUser) saveShopData();
+  closeBuilder();
+  if (buildPendingMode === 'multi') return;
+  gameMode = buildPendingMode;
+  startGame();
 }
 
 function renderShopWeapons() {
@@ -4561,17 +5065,15 @@ function renderShopCollection() {
   var el = document.getElementById('shopList');
   var html = '<div style="color:#888;font-size:10px;text-align:center;margin-bottom:8px">YOUR COLLECTION</div>';
 
-  html += '<div style="font-size:11px;color:#ddd;margin-bottom:4px">TANKS</div>';
-  var hasTank = false;
-  for (var i = 0; i < tankTypes.length; i++) {
-    var t = tankTypes[i];
-    if (ownedTanks.indexOf(t.id) !== -1) {
-      hasTank = true;
-      var eq = selectedTankId === t.id ? ' <span style="color:#44ff88;font-size:9px">[EQUIPPED]</span>' : '';
-      html += '<div style="color:' + t.color + ';font-size:11px;padding:2px 4px">' + t.name + eq + '</div>';
-    }
+  html += '<div style="font-size:11px;color:#ddd;margin-bottom:4px">BOUW BLOKKEN</div>';
+  var hasPart = false;
+  for (var i = 0; i < partDefs.length; i++) {
+    var pc = partDefs[i];
+    var cnt = ownedParts[pc.id] || 0;
+    hasPart = true;
+    html += '<div style="font-size:11px;padding:2px 4px"><span style="display:inline-block;width:11px;height:11px;border-radius:2px;vertical-align:middle;margin-right:4px;background:' + pc.color + '"></span><span style="color:#ddd">' + pc.name + '</span> <span style="color:#ffdd44">x' + cnt + '</span></div>';
   }
-  if (!hasTank) html += '<div style="color:#666;font-size:10px;padding:2px 4px">None owned</div>';
+  if (!hasPart) html += '<div style="color:#666;font-size:10px;padding:2px 4px">None owned</div>';
 
   html += '<div style="font-size:11px;color:#ddd;margin-top:8px;margin-bottom:4px">WEAPONS <span style="color:#666;font-weight:normal;font-size:9px">(loadout: ' + lobbyLoadout.map(function(idx){return weapons[idx]?weapons[idx].name:'?';}).join(' | ') + ')</span></div>';
   var hasWep = false;
@@ -4599,16 +5101,14 @@ function renderShopCollection() {
   if (!hasCol) html += '<div style="color:#666;font-size:10px;padding:2px 4px">None owned</div>';
 
   html += '<div style="font-size:11px;color:#ddd;margin-top:8px;margin-bottom:4px">UPGRADES</div>';
+  migrateUpgrades();
   var hasUpg = false;
   for (var key in upgradeLevels) {
-    hasUpg = true;
-    var parts = key.split('_');
-    var tid = parts[0], uid = parts[1];
-    var tt = null, uu = null;
-    for (var j = 0; j < tankTypes.length; j++) { if (tankTypes[j].id === tid) { tt = tankTypes[j]; break; } }
-    for (var j = 0; j < upgradeDefs.length; j++) { if (upgradeDefs[j].id === uid) { uu = upgradeDefs[j]; break; } }
-    if (tt && uu) {
-      html += '<div style="color:#aaa;font-size:10px;padding:2px 4px">' + tt.name + ' — ' + uu.name + ' Lv.' + upgradeLevels[key] + '</div>';
+    var uu = null;
+    for (var j = 0; j < upgradeDefs.length; j++) { if (upgradeDefs[j].id === key) { uu = upgradeDefs[j]; break; } }
+    if (uu) {
+      hasUpg = true;
+      html += '<div style="color:#aaa;font-size:10px;padding:2px 4px">' + uu.name + ' Lv.' + upgradeLevels[key] + '</div>';
     }
   }
   if (!hasUpg) html += '<div style="color:#666;font-size:10px;padding:2px 4px">No upgrades purchased</div>';
@@ -4616,26 +5116,22 @@ function renderShopCollection() {
   el.innerHTML = html;
 }
 
-function getTankStats() {
-  var t = null;
-  for (var i = 0; i < tankTypes.length; i++) { if (tankTypes[i].id === selectedTankId) { t = tankTypes[i]; break; } }
-  if (!t) t = tankTypes[0];
-  var hp = t.hp, speed = t.speed, shield = t.shield, dmg = t.dmgMult;
-  for (var id in upgradeLevels) {
-    if (id.indexOf(selectedTankId + '_') !== 0) continue;
-    var uid = id.substring(selectedTankId.length + 1);
-    var u = null;
-    for (var j = 0; j < upgradeDefs.length; j++) { if (upgradeDefs[j].id === uid) { u = upgradeDefs[j]; break; } }
-    if (!u) continue;
-    var lv = upgradeLevels[id];
-    for (var k = 0; k < lv; k++) {
-      if (uid === 'hp') hp += u.bonus[k];
-      else if (uid === 'speed') speed += u.bonus[k];
-      else if (uid === 'shield') shield += u.bonus[k];
-      else if (uid === 'damage') dmg += u.bonus[k];
+function getTankStats(p2) {
+  var grid = p2 ? buildGrid2 : buildGrid;
+  var st = computeBuildStats(grid);
+  var hp = st.hp, shield = st.shield, dmg = st.dmg, speed = st.speed;
+  migrateUpgrades();
+  for (var ui = 0; ui < upgradeDefs.length; ui++) {
+    var u = upgradeDefs[ui];
+    var lv = upgradeLevels[u.id] || 0;
+    for (var k = 0; k < lv && k < u.levels; k++) {
+      if (u.id === 'hp') hp += u.bonus[k];
+      else if (u.id === 'speed') speed += u.bonus[k];
+      else if (u.id === 'shield') shield += u.bonus[k];
+      else if (u.id === 'damage') dmg += u.bonus[k];
     }
   }
-  return { hp: hp, speed: speed, shield: shield, dmg: dmg, color: t.color };
+  return { hp: Math.round(hp), speed: Math.round(speed * 100) / 100, shield: shield, dmg: dmg, w: st.w, grid: grid, counts: st.counts, color: '#88ccff' };
 }
 setTimeout(function(){ if (typeof applySavedSettings === 'function') applySavedSettings(); if (typeof updateOnlineUI === 'function') updateOnlineUI(); if (typeof tryAutoLogin === 'function') tryAutoLogin(); }, 500);
 setTimeout(function(){ if (typeof updateColorPickers === 'function') updateColorPickers(); }, 800);
